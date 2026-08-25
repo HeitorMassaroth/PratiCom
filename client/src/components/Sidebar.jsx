@@ -1,0 +1,78 @@
+import React from 'react';
+import {
+  LayoutDashboard,
+  Package,
+  DollarSign,
+  ShieldCheck,
+  Users,
+  CalendarDays,
+  Megaphone,
+  ShoppingCart,
+  Building2,
+  Bell
+} from 'lucide-react';
+
+export default function Sidebar({ currentView, setCurrentView, stats }) {
+  const menuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'deliveries', label: 'Controle de Encomendas', icon: Package, badge: stats?.pendingDeliveries, badgeAlert: stats?.pendingDeliveries > 0 },
+    { id: 'financial', label: 'Financeiro & Taxas', icon: DollarSign, badge: stats?.overdueCount ? `${stats.overdueCount} pendentes` : null, badgeAlert: stats?.overdueCount > 0 },
+    { id: 'access', label: 'Portaria & Acessos', icon: ShieldCheck, badge: stats?.activeVisitors ? `${stats.activeVisitors} no prédio` : null },
+    { id: 'residents', label: 'Cadastro de Pessoas', icon: Users },
+    { id: 'reservations', label: 'Reservas (1h/dia)', icon: CalendarDays, badge: stats?.todayReservations ? `${stats.todayReservations} hoje` : null },
+    { id: 'announcements', label: 'Mural de Avisos', icon: Megaphone },
+    { id: 'market', label: 'Mercadinho & Estoque', icon: ShoppingCart, badge: stats?.lowStockItems ? `${stats.lowStockItems} repor` : null, badgeAlert: stats?.lowStockItems > 0 },
+  ];
+
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-header">
+        <div className="logo-icon">
+          <Building2 size={24} />
+        </div>
+        <div className="brand-text">
+          <h2>Praticon</h2>
+          <span>ERP Condominial</span>
+        </div>
+      </div>
+
+      <ul className="nav-links">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentView === item.id;
+          return (
+            <li key={item.id}>
+              <button
+                className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => setCurrentView(item.id)}
+                style={{ width: '100%', background: isActive ? undefined : 'transparent', border: 'none', textAlign: 'left' }}
+              >
+                <div className="nav-item-content">
+                  <Icon size={19} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge !== undefined && item.badge !== null && item.badge !== 0 && (
+                  <span className={`nav-badge ${item.badgeAlert ? 'alert' : ''}`}>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="sidebar-footer">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>
+            CE
+          </div>
+          <div>
+            <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-main)' }}>Carlos Eduardo</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Síndico Geral</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
