@@ -13,7 +13,7 @@ export default function Header({ currentView, theme, toggleTheme, userRole, setU
     market: { title: 'Mercadinho Autônomo & Estoque', subtitle: 'Controle de estoque, alerta de reposição e terminal PDV de autoatendimento' },
   };
 
-  const currentInfo = titles[currentView] || { title: 'Praticon', subtitle: 'Sistema de Gestão Condominial' };
+  const currentInfo = titles[currentView] || { title: 'Praticom', subtitle: 'Sistema de Gestão Condominial' };
 
   return (
     <header className="topbar">

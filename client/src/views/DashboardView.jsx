@@ -26,8 +26,8 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
     <div>
       {/* Banner de Boas-Vindas */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(99, 102, 241, 0.1) 100%)',
-        border: '1px solid rgba(59, 130, 246, 0.25)',
+        background: 'var(--accent-mint)',
+        border: '1px solid rgba(130, 199, 135, 0.4)',
         borderRadius: 'var(--radius-xl)',
         padding: '24px 30px',
         marginBottom: '28px',
@@ -39,18 +39,21 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span className="badge badge-info"><Sparkles size={13} /> Sistema Ativo</span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Condomínio Residencial Parque das Flores</span>
+            <span className="badge badge-success"><Sparkles size={13} /> Sistema Ativo</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--brand-forest)', fontWeight: '600' }}>Condomínio Residencial Parque das Flores</span>
           </div>
-          <h2 style={{ fontSize: '1.6rem', color: 'var(--text-main)', fontWeight: '800' }}>
-            Olá, Síndico! Aqui está o panorama do condomínio hoje.
+          <h2 style={{ fontSize: '1.6rem', color: 'var(--brand-forest)', fontWeight: '800' }}>
+            Bem-vindo(a) ao PratiCom!
           </h2>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Tudo o que você precisa para o seu condomínio de forma rápida e prática.
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-primary" onClick={() => setCurrentView('deliveries')}>
             <Package size={16} /> Nova Encomenda
           </button>
-          <button className="btn btn-secondary" onClick={() => setCurrentView('access')}>
+          <button className="btn btn-suave" onClick={() => setCurrentView('access')}>
             <ShieldCheck size={16} /> Liberar Acesso
           </button>
         </div>
@@ -59,7 +62,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
       {/* Grid de KPIs Principais */}
       <div className="metrics-grid">
         <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setCurrentView('deliveries')}>
-          <div className="metric-icon-box" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' }}>
+          <div className="metric-icon-box" style={{ background: 'var(--accent-mint)', color: 'var(--accent-mint-text)' }}>
             <Package size={26} />
           </div>
           <div className="metric-info">
@@ -70,12 +73,12 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
         </div>
 
         <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setCurrentView('financial')}>
-          <div className="metric-icon-box" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
+          <div className="metric-icon-box" style={{ background: 'rgba(130, 199, 135, 0.2)', color: 'var(--accent-mint-text)' }}>
             <DollarSign size={26} />
           </div>
           <div className="metric-info">
             <h4>Saldo em Caixa</h4>
-            <div className="value" style={{ color: '#10b981' }}>
+            <div className="value" style={{ color: 'var(--accent-mint-text)' }}>
               R$ {(metrics.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <div className="subtext">
@@ -85,7 +88,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
         </div>
 
         <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setCurrentView('access')}>
-          <div className="metric-icon-box" style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6' }}>
+          <div className="metric-icon-box" style={{ background: 'var(--accent-info-bg)', color: 'var(--accent-info-text)' }}>
             <ShieldCheck size={26} />
           </div>
           <div className="metric-info">
@@ -96,7 +99,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
         </div>
 
         <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setCurrentView('reservations')}>
-          <div className="metric-icon-box" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }}>
+          <div className="metric-icon-box" style={{ background: 'var(--accent-warning-bg)', color: 'var(--accent-warning-text)' }}>
             <CalendarDays size={26} />
           </div>
           <div className="metric-info">
@@ -107,16 +110,16 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
         </div>
 
         <div className="metric-card" style={{ cursor: 'pointer' }} onClick={() => setCurrentView('market')}>
-          <div className="metric-icon-box" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+          <div className="metric-icon-box" style={{ background: 'var(--accent-danger-bg)', color: 'var(--accent-danger-text)' }}>
             <ShoppingCart size={26} />
           </div>
           <div className="metric-info">
             <h4>Estoque do Mercadinho</h4>
-            <div className="value" style={{ color: metrics.lowStockItems > 0 ? '#ef4444' : 'inherit' }}>
+            <div className="value" style={{ color: metrics.lowStockItems > 0 ? 'var(--accent-danger-text)' : 'inherit' }}>
               {metrics.lowStockItems ?? 0}
             </div>
             <div className="subtext">
-              {metrics.lowStockItems > 0 ? 'Itens atingiram estoque mínimo' : 'Estoque abastecido'}
+              {metrics.lowStockItems > 0 ? 'Itens abaixo do estoque mínimo' : 'Estoque abastecido'}
             </div>
           </div>
         </div>

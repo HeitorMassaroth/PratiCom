@@ -31,8 +31,8 @@ export default function Sidebar({ currentView, setCurrentView, stats }) {
           <Building2 size={24} />
         </div>
         <div className="brand-text">
-          <h2>Praticon</h2>
-          <span>ERP Condominial</span>
+          <h2>praticom</h2>
+          <span>Gestão Condominial</span>
         </div>
       </div>
 
@@ -64,12 +64,12 @@ export default function Sidebar({ currentView, setCurrentView, stats }) {
 
       <div className="sidebar-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>
-            CE
+          <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'var(--accent-mint)', border: '1px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '13px', color: 'var(--accent-mint-text)' }}>
+            MA
           </div>
           <div>
-            <div style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-main)' }}>Carlos Eduardo</div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Síndico Geral</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-main)' }}>Mariana Alves</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Síndica Profissional</div>
           </div>
         </div>
       </div>
