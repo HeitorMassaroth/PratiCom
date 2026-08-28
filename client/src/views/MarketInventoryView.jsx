@@ -624,7 +624,7 @@ export default function MarketInventoryView({ showToast }) {
                     <QrCode size={90} color="#000" />
                   </div>
                   <div style={{ fontSize: '0.85rem', fontWeight: '700' }}>Escaneie o QR Code no app do seu banco</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Chave PIX: pix-condo@praticon.com.br</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Chave PIX: pix-condo@praticom.com.br</div>
                 </div>
               )}
             </div>
