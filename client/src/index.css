@@ -75,31 +75,37 @@
   --radius-full: 9999px;
 }
 
-/* Modo Escuro (Emerald / Forest Luxury) */
+/* Modo Escuro (Sleek Dark Modern - Sem camuflagem forest com o fundo) */
 [data-theme="dark"] {
-  --bg-primary: #0F1E17;
-  --bg-secondary: #142820;
-  --bg-card: #183025;
-  --bg-card-hover: #1E3B2E;
-  --bg-glass: rgba(24, 48, 37, 0.85);
+  /* No modo escuro, brand-forest mapeia para tom claro e legível para nunca camuflar */
+  --brand-forest: #82C787;
+  --brand-forest-dark: #68BA73;
+  --brand-forest-light: #A3E6B1;
+
+  --bg-primary: #0B0F17;
+  --bg-secondary: #111827;
+  --bg-card: #182030;
+  --bg-card-hover: #1F2A3F;
+  --bg-glass: rgba(18, 24, 38, 0.85);
   
-  --border-color: rgba(130, 199, 135, 0.15);
-  --border-subtle: rgba(130, 199, 135, 0.08);
+  --border-color: rgba(255, 255, 255, 0.09);
+  --border-subtle: rgba(255, 255, 255, 0.05);
   --border-focus: #82C787;
   
-  --text-main: #F3F8F5;
-  --text-muted: #9ABBB0;
-  --text-dim: #648577;
-  --text-inverse: #142920;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-dim: #64748B;
+  --text-inverse: #0B0F17;
 
-  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 16px 40px -8px rgba(0, 0, 0, 0.6);
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 40px -8px rgba(0, 0, 0, 0.7);
   --shadow-glow: 0 0 24px rgba(130, 199, 135, 0.25);
 
-  --accent-mint: rgba(130, 199, 135, 0.18);
+  --accent-mint: rgba(130, 199, 135, 0.15);
   --accent-mint-text: #82C787;
+  --accent-mint-hover: rgba(130, 199, 135, 0.25);
   --accent-warning-bg: rgba(245, 158, 11, 0.15);
   --accent-warning-text: #FBBF24;
   --accent-warning-border: rgba(245, 158, 11, 0.3);
@@ -167,6 +173,10 @@ h1, h2, h3, h4, h5, h6 {
   color: #FFFFFF;
 }
 
+[data-theme="dark"] .sidebar-header {
+  background: var(--bg-secondary);
+}
+
 .logo-icon {
   width: 44px;
   height: 44px;
@@ -178,6 +188,11 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   font-weight: 800;
   box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .logo-icon {
+  background: var(--accent-primary);
+  color: #0B0F17;
 }
 
 .brand-text h2 {
@@ -227,12 +242,23 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateX(3px);
 }
 
+[data-theme="dark"] .nav-item:hover {
+  background: rgba(130, 199, 135, 0.12);
+  color: var(--accent-primary);
+}
+
 .nav-item.active {
   background: var(--accent-mint);
   color: var(--brand-forest);
   font-weight: 700;
   border-color: var(--accent-primary);
   box-shadow: var(--shadow-xs);
+}
+
+[data-theme="dark"] .nav-item.active {
+  background: rgba(130, 199, 135, 0.18);
+  color: #FFFFFF;
+  border-color: var(--accent-primary);
 }
 
 .nav-item-content {
@@ -248,6 +274,12 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
   background: var(--brand-forest);
   color: #FFFFFF;
+}
+
+[data-theme="dark"] .nav-badge:not(.alert) {
+  background: rgba(130, 199, 135, 0.2);
+  color: var(--accent-primary);
+  border: 1px solid rgba(130, 199, 135, 0.35);
 }
 
 .nav-badge.alert {
@@ -378,7 +410,7 @@ h1, h2, h3, h4, h5, h6 {
 
 [data-theme="dark"] .role-btn.active {
   background: var(--accent-primary);
-  color: var(--brand-forest-dark);
+  color: #0B0F17;
 }
 
 .theme-toggle-btn {
@@ -400,6 +432,10 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--brand-forest);
 }
 
+[data-theme="dark"] .theme-toggle-btn:hover {
+  color: var(--accent-primary);
+}
+
 /* Conteúdo Principal */
 .content-body {
   padding: 32px;
@@ -407,6 +443,45 @@ h1, h2, h3, h4, h5, h6 {
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
+}
+
+/* Banner de Boas-Vindas */
+.welcome-banner {
+  background: var(--accent-mint);
+  border: 1px solid rgba(130, 199, 135, 0.4);
+  border-radius: var(--radius-xl);
+  padding: 24px 30px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+[data-theme="dark"] .welcome-banner {
+  background: rgba(130, 199, 135, 0.12);
+  border-color: rgba(130, 199, 135, 0.25);
+}
+
+.welcome-banner-condo {
+  font-size: 0.85rem;
+  color: var(--brand-forest);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .welcome-banner-condo {
+  color: var(--accent-primary);
+}
+
+.welcome-banner-title {
+  font-size: 1.6rem;
+  color: var(--brand-forest);
+  font-weight: 800;
+}
+
+[data-theme="dark"] .welcome-banner-title {
+  color: var(--text-main);
 }
 
 /* Card Padrão Praticom */
@@ -774,6 +849,10 @@ input:checked + .slider:before {
   animation: fadeIn 0.2s ease;
 }
 
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.75);
+}
+
 .modal-content {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -934,6 +1013,11 @@ input:checked + .slider:before {
   border-color: var(--accent-primary);
   background: var(--accent-mint);
   color: var(--brand-forest);
+}
+
+[data-theme="dark"] .slot-button:hover:not(.occupied):not(:disabled) {
+  background: rgba(130, 199, 135, 0.2);
+  color: #FFFFFF;
 }
 
 .slot-button.selected {

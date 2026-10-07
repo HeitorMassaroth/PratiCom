@@ -25,24 +25,13 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
   return (
     <div>
       {/* Banner de Boas-Vindas */}
-      <div style={{
-        background: 'var(--accent-mint)',
-        border: '1px solid rgba(130, 199, 135, 0.4)',
-        borderRadius: 'var(--radius-xl)',
-        padding: '24px 30px',
-        marginBottom: '28px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '16px'
-      }}>
+      <div className="welcome-banner">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
             <span className="badge badge-success"><Sparkles size={13} /> Sistema Ativo</span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--brand-forest)', fontWeight: '600' }}>Condomínio Residencial Parque das Flores</span>
+            <span className="welcome-banner-condo">Condomínio Residencial Parque das Flores</span>
           </div>
-          <h2 style={{ fontSize: '1.6rem', color: 'var(--brand-forest)', fontWeight: '800' }}>
+          <h2 className="welcome-banner-title">
             Bem-vindo(a) ao PratiCom!
           </h2>
           <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '4px' }}>
