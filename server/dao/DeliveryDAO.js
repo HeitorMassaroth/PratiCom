@@ -11,15 +11,26 @@ export class DeliveryDAO {
     this.notifier = new DeliveryNotificationDispatcher();
   }
 
-  getDeliveries({ status, unit_id } = {}) {
+  getDeliveries({ condominiumId, status, unit_id } = {}) {
     let sql = `
       SELECT d.*, u.block, u.number as unit_number, r.name as resident_name
       FROM deliveries d
       LEFT JOIN units u ON d.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
       LEFT JOIN residents r ON d.resident_id = r.id
       WHERE 1=1
     `;
     const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
 
     if (status) {
       sql += ' AND d.status = ?';

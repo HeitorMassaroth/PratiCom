@@ -5,20 +5,45 @@ export class ReservationDAO {
     this.db = DatabaseSingleton.getDb();
   }
 
-  getSpaces() {
-    return this.db.prepare('SELECT * FROM spaces ORDER BY name ASC').all();
+  getSpaces({ condominiumId } = {}) {
+    let sql = 'SELECT * FROM spaces WHERE 1=1';
+    const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (condominium_id = 1 OR condominium_id IS NULL)';
+      } else {
+        sql += ' AND condominium_id = ?';
+        params.push(cId);
+      }
+    }
+
+    sql += ' ORDER BY name ASC';
+    return this.db.prepare(sql).all(params);
   }
 
-  getReservations({ space_id, date } = {}) {
+  getReservations({ condominiumId, space_id, date } = {}) {
     let sql = `
       SELECT r.*, s.name as space_name, u.block, u.number as unit_number, res.name as resident_name
       FROM reservations r
       LEFT JOIN spaces s ON r.space_id = s.id
       LEFT JOIN units u ON r.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
       LEFT JOIN residents res ON r.resident_id = res.id
       WHERE 1=1
     `;
     const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (s.condominium_id = 1 OR s.condominium_id IS NULL OR b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND (s.condominium_id = ? OR b.condominium_id = ?)';
+        params.push(cId, cId);
+      }
+    }
 
     if (space_id) {
       sql += ' AND r.space_id = ?';

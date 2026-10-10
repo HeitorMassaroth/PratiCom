@@ -8,9 +8,19 @@ export class MarketDAO {
     this.condoFeeProcessor = new CondoFeePaymentProcessor();
   }
 
-  getProducts({ category, search } = {}) {
+  getProducts({ condominiumId, category, search } = {}) {
     let sql = 'SELECT * FROM market_products WHERE 1=1';
     const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (condominium_id = 1 OR condominium_id IS NULL)';
+      } else {
+        sql += ' AND condominium_id = ?';
+        params.push(cId);
+      }
+    }
 
     if (category) {
       sql += ' AND category = ?';
@@ -38,11 +48,12 @@ export class MarketDAO {
   createProduct(data) {
     const priceVal = parseFloat(data.price || data.sale_price || 0);
     const stmt = this.db.prepare(`
-      INSERT INTO market_products (name, category, price, stock_quantity, barcode)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO market_products (condominium_id, name, category, price, stock_quantity, barcode)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     const info = stmt.run(
+      data.condominium_id ? parseInt(data.condominium_id, 10) : null,
       data.name,
       data.category || 'Alimentos',
       priceVal,
@@ -97,7 +108,6 @@ export class MarketDAO {
     const isCondoBill = payment_method === 'CONDO_FEE' || payment_method === 'condo_bill';
     const methodFormatted = isCondoBill ? 'CONDO_FEE' : 'PIX';
 
-    // Calcula total se não enviado ou se inválido
     const calculatedTotal = Array.isArray(items) 
       ? items.reduce((sum, item) => sum + (parseFloat(item.price || item.sale_price || 0) * parseInt(item.quantity || 1, 10)), 0)
       : 0;
@@ -176,15 +186,29 @@ export class MarketDAO {
     return transaction();
   }
 
-  getSales() {
-    const sql = `
+  getSales({ condominiumId } = {}) {
+    let sql = `
       SELECT s.*, u.block, u.number as unit_number, r.name as resident_name
       FROM market_sales s
       LEFT JOIN units u ON s.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
       LEFT JOIN residents r ON s.resident_id = r.id
-      ORDER BY s.created_at DESC
+      WHERE 1=1
     `;
-    const sales = this.db.prepare(sql).all();
+    const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
+
+    sql += ' ORDER BY s.created_at DESC';
+    const sales = this.db.prepare(sql).all(params);
     const getItems = this.db.prepare(`
       SELECT product_id, product_name AS name, unit_price AS price, quantity, line_total
       FROM market_sale_items

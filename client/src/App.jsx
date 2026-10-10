@@ -48,6 +48,13 @@ export default function App() {
     }
   };
 
+  const [condoRefreshKey, setCondoRefreshKey] = useState(Date.now());
+
+  const handleCondoChange = () => {
+    loadDashboardMetrics();
+    setCondoRefreshKey(Date.now());
+  };
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     loadDashboardMetrics();
@@ -68,15 +75,18 @@ export default function App() {
       <div className="main-wrapper">
         <Header 
           currentView={currentView}
+          setCurrentView={setCurrentView}
           theme={theme}
           toggleTheme={toggleTheme}
           userRole={userRole}
           setUserRole={setUserRole}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
+          showToast={showToast}
+          onCondoChange={handleCondoChange}
         />
 
-        <main className="content-body">
+        <main className="content-body" key={condoRefreshKey}>
           {currentView === 'dashboard' && (
             <DashboardView 
               data={dashboardData} 

@@ -9,8 +9,27 @@ export class ResidentDAO {
     this.db = DatabaseSingleton.getDb();
   }
 
-  getUnits() {
-    const units = this.db.prepare('SELECT * FROM units ORDER BY block, number').all();
+  getUnits({ condominiumId } = {}) {
+    let sql = `
+      SELECT u.* 
+      FROM units u
+      LEFT JOIN blocks b ON u.block_id = b.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
+
+    sql += ' ORDER BY u.block, u.number';
+    const units = this.db.prepare(sql).all(params);
     return units.map(u => {
       const resCount = this.db.prepare('SELECT COUNT(*) as count FROM residents WHERE unit_id = ?').get(u.id).count;
       const vehCount = this.db.prepare('SELECT COUNT(*) as count FROM vehicles WHERE unit_id = ?').get(u.id).count;
@@ -24,14 +43,147 @@ export class ResidentDAO {
     });
   }
 
-  getResidents({ unit_id, search } = {}) {
+  getUnit(id) {
+    const unit = this.db.prepare('SELECT u.*, b.condominium_id FROM units u LEFT JOIN blocks b ON u.block_id = b.id WHERE u.id = ?').get(parseInt(id, 10));
+    if (!unit) return null;
+    const resCount = this.db.prepare('SELECT COUNT(*) as count FROM residents WHERE unit_id = ?').get(unit.id).count;
+    const vehCount = this.db.prepare('SELECT COUNT(*) as count FROM vehicles WHERE unit_id = ?').get(unit.id).count;
+    const petCount = this.db.prepare('SELECT COUNT(*) as count FROM pets WHERE unit_id = ?').get(unit.id).count;
+    return {
+      ...unit,
+      residents_count: resCount,
+      vehicles_count: vehCount,
+      pets_count: petCount
+    };
+  }
+
+  createUnit(data) {
+    if (!data.number || !String(data.number).trim()) {
+      throw new Error('Número da unidade é obrigatório.');
+    }
+    const blockId = data.block_id ? parseInt(data.block_id, 10) : null;
+    if (!blockId) {
+      throw new Error('Bloco é obrigatório.');
+    }
+
+    const blockObj = this.db.prepare('SELECT * FROM blocks WHERE id = ?').get(blockId);
+    if (!blockObj) {
+      throw new Error('Bloco não encontrado.');
+    }
+
+    const numberStr = String(data.number).trim();
+
+    // Validar duplicidade no mesmo bloco
+    const existing = this.db.prepare('SELECT id FROM units WHERE block_id = ? AND number = ?').get(blockId, numberStr);
+    if (existing) {
+      throw new Error(`A unidade '${numberStr}' já está cadastrada no bloco '${blockObj.name}'.`);
+    }
+
+    const stmt = this.db.prepare(`
+      INSERT INTO units (block, block_id, number, floor, type)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    const info = stmt.run(
+      blockObj.name,
+      blockId,
+      numberStr,
+      data.floor ? parseInt(data.floor, 10) : 1,
+      data.type || 'Residencial'
+    );
+
+    return this.getUnit(info.lastInsertRowid);
+  }
+
+  updateUnit(id, data) {
+    const unit = this.getUnit(id);
+    if (!unit) {
+      throw new Error('Unidade não encontrada.');
+    }
+
+    if (!data.number || !String(data.number).trim()) {
+      throw new Error('Número da unidade é obrigatório.');
+    }
+
+    const blockId = data.block_id ? parseInt(data.block_id, 10) : unit.block_id;
+    const blockObj = this.db.prepare('SELECT * FROM blocks WHERE id = ?').get(blockId);
+    if (!blockObj) {
+      throw new Error('Bloco não encontrado.');
+    }
+
+    const numberStr = String(data.number).trim();
+
+    // Validar duplicidade se alterou o número ou o bloco
+    const existing = this.db.prepare('SELECT id FROM units WHERE block_id = ? AND number = ? AND id != ?').get(blockId, numberStr, parseInt(id, 10));
+    if (existing) {
+      throw new Error(`A unidade '${numberStr}' já existe no bloco '${blockObj.name}'.`);
+    }
+
+    this.db.prepare(`
+      UPDATE units 
+      SET block = ?, block_id = ?, number = ?, floor = ?, type = ?
+      WHERE id = ?
+    `).run(
+      blockObj.name,
+      blockId,
+      numberStr,
+      data.floor ? parseInt(data.floor, 10) : unit.floor,
+      data.type || unit.type,
+      parseInt(id, 10)
+    );
+
+    return this.getUnit(id);
+  }
+
+  deleteUnit(id) {
+    const uId = parseInt(id, 10);
+    const unit = this.getUnit(uId);
+    if (!unit) {
+      throw new Error('Unidade não encontrada.');
+    }
+
+    // Checagem de dependências relacionais
+    const resCount = this.db.prepare('SELECT COUNT(*) as count FROM residents WHERE unit_id = ?').get(uId).count;
+    if (resCount > 0) throw new Error(`Não é possível excluir a unidade '${unit.number}': possui ${resCount} morador(es) vinculado(s).`);
+
+    const vehCount = this.db.prepare('SELECT COUNT(*) as count FROM vehicles WHERE unit_id = ?').get(uId).count;
+    if (vehCount > 0) throw new Error(`Não é possível excluir a unidade '${unit.number}': possui ${vehCount} veículo(s) vinculado(s).`);
+
+    const delCount = this.db.prepare('SELECT COUNT(*) as count FROM deliveries WHERE unit_id = ?').get(uId).count;
+    if (delCount > 0) throw new Error(`Não é possível excluir a unidade '${unit.number}': possui encomendas registradas.`);
+
+    const accCount = this.db.prepare('SELECT COUNT(*) as count FROM access_logs WHERE destination_unit_id = ?').get(uId).count;
+    if (accCount > 0) throw new Error(`Não é possível excluir a unidade '${unit.number}': possui registros de portaria/acesso.`);
+
+    const finCount = this.db.prepare('SELECT COUNT(*) as count FROM financial_transactions WHERE unit_id = ?').get(uId).count;
+    if (finCount > 0) throw new Error(`Não é possível excluir a unidade '${unit.number}': possui histórico financeiro/boletos.`);
+
+    const resvCount = this.db.prepare('SELECT COUNT(*) as count FROM reservations WHERE unit_id = ?').get(uId).count;
+    if (resvCount > 0) throw new Error(`Não é possível excluir a unidade '${unit.number}': possui reservas registradas.`);
+
+    const result = this.db.prepare('DELETE FROM units WHERE id = ?').run(uId);
+    return result.changes > 0;
+  }
+
+  getResidents({ condominiumId, unit_id, search } = {}) {
     let sql = `
       SELECT r.*, u.block, u.number as unit_number 
       FROM residents r
       LEFT JOIN units u ON r.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
       WHERE 1=1
     `;
     const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
 
     if (unit_id) {
       sql += ' AND r.unit_id = ?';
@@ -74,15 +226,27 @@ export class ResidentDAO {
     return info.changes > 0;
   }
 
-  getVehicles() {
-    const sql = `
+  getVehicles({ condominiumId } = {}) {
+    let sql = `
       SELECT v.*, u.block, u.number as unit_number, r.name as resident_name
       FROM vehicles v
       LEFT JOIN units u ON v.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
       LEFT JOIN residents r ON v.resident_id = r.id
-      ORDER BY v.id DESC
+      WHERE 1=1
     `;
-    return this.db.prepare(sql).all();
+    const params = [];
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
+    sql += ' ORDER BY v.id DESC';
+    return this.db.prepare(sql).all(params);
   }
 
   createVehicle(data) {
@@ -102,14 +266,26 @@ export class ResidentDAO {
     return this.db.prepare('SELECT * FROM vehicles WHERE id = ?').get(info.lastInsertRowid);
   }
 
-  getPets() {
-    const sql = `
+  getPets({ condominiumId } = {}) {
+    let sql = `
       SELECT p.*, u.block, u.number as unit_number, r.name as resident_name
       FROM pets p
       LEFT JOIN units u ON p.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
       LEFT JOIN residents r ON p.resident_id = r.id
-      ORDER BY p.id DESC
+      WHERE 1=1
     `;
-    return this.db.prepare(sql).all();
+    const params = [];
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
+    sql += ' ORDER BY p.id DESC';
+    return this.db.prepare(sql).all(params);
   }
 }

@@ -11,14 +11,25 @@ export class AccessDAO {
     this.db = DatabaseSingleton.getDb();
   }
 
-  getAccessLogs({ status, type, search } = {}) {
+  getAccessLogs({ condominiumId, status, type, search } = {}) {
     let sql = `
       SELECT a.*, u.block, u.number as unit_number
       FROM access_logs a
       LEFT JOIN units u ON a.destination_unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
       WHERE 1=1
     `;
     const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
 
     if (status) {
       sql += ' AND a.status = ?';
@@ -76,9 +87,19 @@ export class AnnouncementDAO {
     this.notifier = new AnnouncementNotificationDispatcher();
   }
 
-  getAnnouncements({ category, search } = {}) {
+  getAnnouncements({ condominiumId, category, search } = {}) {
     let sql = 'SELECT * FROM announcements WHERE 1=1';
     const params = [];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (condominium_id = 1 OR condominium_id IS NULL)';
+      } else {
+        sql += ' AND condominium_id = ?';
+        params.push(cId);
+      }
+    }
 
     if (category) {
       sql += ' AND category = ?';
@@ -97,11 +118,12 @@ export class AnnouncementDAO {
 
   createAnnouncement(data) {
     const stmt = this.db.prepare(`
-      INSERT INTO announcements (title, content, category, priority, author, target_block, is_pinned, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO announcements (condominium_id, title, content, category, priority, author, target_block, is_pinned, expires_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const info = stmt.run(
+      data.condominium_id ? parseInt(data.condominium_id, 10) : null,
       data.title,
       data.content,
       data.category || 'Geral',

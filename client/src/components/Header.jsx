@@ -1,7 +1,8 @@
 import React from 'react';
 import { Sun, Moon, Search, Bell, Shield, User, Building } from 'lucide-react';
+import CondominiumSelector from './CondominiumSelector';
 
-export default function Header({ currentView, theme, toggleTheme, userRole, setUserRole, searchTerm, setSearchTerm }) {
+export default function Header({ currentView, setCurrentView, theme, toggleTheme, userRole, setUserRole, searchTerm, setSearchTerm, showToast, onCondoChange }) {
   const titles = {
     dashboard: { title: 'Visão Geral & Dashboard', subtitle: 'Painel executivo com métricas consolidadas em tempo real' },
     deliveries: { title: 'Controle de Encomendas', subtitle: 'Recebimento de pacotes, notificação e confirmação por PIN' },
@@ -26,6 +27,13 @@ export default function Header({ currentView, theme, toggleTheme, userRole, setU
       </div>
 
       <div className="topbar-right">
+        {/* Seletor Visual de Condomínio Ativo */}
+        <CondominiumSelector 
+          onCondoChange={onCondoChange}
+          showToast={showToast}
+          setCurrentView={setCurrentView}
+        />
+
         <div className="search-box">
           <Search size={16} />
           <input

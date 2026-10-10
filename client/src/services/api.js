@@ -1,9 +1,21 @@
 const API_BASE = 'http://localhost:5000/api';
 
+let activeCondominiumId = localStorage.getItem('praticom_active_condo_id') || '1';
+
+export function setActiveCondominiumId(id) {
+  activeCondominiumId = String(id);
+  localStorage.setItem('praticom_active_condo_id', String(id));
+}
+
+export function getActiveCondominiumId() {
+  return activeCondominiumId;
+}
+
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
+    'X-Condominium-Id': activeCondominiumId,
     ...(options.headers || {}),
   };
 
@@ -39,6 +51,8 @@ export const api = {
   createBlock: (condominiumId, data) => request(`/condominiums/${condominiumId}/blocks`, { method: 'POST', body: JSON.stringify(data) }),
   updateBlock: (id, data) => request(`/blocks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   updateBlockStatus: (id, status) => request(`/blocks/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  deleteCondominium: (id) => request(`/condominiums/${id}`, { method: 'DELETE' }),
+  deleteBlock: (id) => request(`/blocks/${id}`, { method: 'DELETE' }),
   getPendingUnits: () => request('/territory/pending-units'),
   mapLegacyUnits: (blockId, legacy_block) => request(`/blocks/${blockId}/map-legacy-units`, { method: 'PATCH', body: JSON.stringify({ legacy_block }) }),
   // Dashboard
@@ -62,6 +76,10 @@ export const api = {
 
   // Unidades & Moradores
   getUnits: () => request('/units'),
+  getUnit: (id) => request(`/units/${id}`),
+  createUnit: (data) => request('/units', { method: 'POST', body: JSON.stringify(data) }),
+  updateUnit: (id, data) => request(`/units/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteUnit: (id) => request(`/units/${id}`, { method: 'DELETE' }),
   getResidents: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/residents${qs ? '?' + qs : ''}`);
@@ -110,6 +128,10 @@ export const api = {
 
   // Configuração LPS
   getFeatures: () => request('/config/features'),
-  updateFeature: (feature, enabled) => request('/config/features', { method: 'PATCH', body: JSON.stringify({ feature, enabled }) })
+  updateFeature: (feature, enabled) => request('/config/features', { method: 'PATCH', body: JSON.stringify({ feature, enabled }) }),
+
+  // Contexto Multi-Tenant
+  setActiveCondominiumId,
+  getActiveCondominiumId
 };
 

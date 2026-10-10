@@ -43,6 +43,9 @@ out/
 *.bak
 *.swp
 *.swo
+*.sqlite-shm
+*.sqlite-wal
+*_backup.sqlite
 
 # Testes & Cobertura
 coverage/

@@ -2,12 +2,14 @@ import express from 'express';
 import cors from 'cors';
 import { DAOFactory } from './dao/DAOFactory.js';
 import AppConfigSingleton from './config/AppConfigSingleton.js';
+import { tenantContextMiddleware } from './middleware/tenantContext.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+app.use(tenantContextMiddleware);
 
 // DAOs instanciadas via Padrão FACTORY METHOD
 const residentDAO = DAOFactory.getDAO('resident');
@@ -53,14 +55,15 @@ const checkFeature = (featureName) => (req, res, next) => {
 // ==========================================
 app.get('/api/dashboard', async (req, res) => {
   try {
-    const deliveries = deliveryDAO.getDeliveries();
+    const condominiumId = req.condominiumId;
+    const deliveries = deliveryDAO.getDeliveries({ condominiumId });
     const pendingDeliveries = deliveries.filter(d => d.status === 'pending' || d.status === 'PENDING');
-    const accessLogs = accessDAO.getAccessLogs();
+    const accessLogs = accessDAO.getAccessLogs({ condominiumId });
     const activeAccess = accessLogs.filter(a => a.status === 'IN_PROPERTY' || a.status === 'inside');
-    const summary = financialDAO.getSummary();
-    const announcements = announcementDAO.getAnnouncements();
+    const summary = financialDAO.getSummary({ condominiumId });
+    const announcements = announcementDAO.getAnnouncements({ condominiumId });
     const urgentAnnouncements = announcements.filter(a => a.priority === 'URGENTE' || a.priority === 'high');
-    const reservations = spaceDAO.getReservations();
+    const reservations = spaceDAO.getReservations({ condominiumId });
 
     const data = {
       metrics: {
@@ -88,7 +91,7 @@ app.get('/api/dashboard', async (req, res) => {
 app.get('/api/deliveries', (req, res) => {
   try {
     const { status, unit_id } = req.query;
-    const deliveries = deliveryDAO.getDeliveries({ status, unit_id });
+    const deliveries = deliveryDAO.getDeliveries({ condominiumId: req.condominiumId, status, unit_id });
     res.json(deliveries);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -130,7 +133,7 @@ app.patch('/api/deliveries/:id/pickup', (req, res) => {
 app.get('/api/access', (req, res) => {
   try {
     const { status, type, search } = req.query;
-    const logs = accessDAO.getAccessLogs({ status, type, search });
+    const logs = accessDAO.getAccessLogs({ condominiumId: req.condominiumId, status, type, search });
     res.json(logs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -165,17 +168,61 @@ app.patch('/api/access/:id/exit', (req, res) => {
 // ==========================================
 app.get('/api/units', (req, res) => {
   try {
-    const units = residentDAO.getUnits();
+    const units = residentDAO.getUnits({ condominiumId: req.condominiumId });
     res.json(units);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+app.post('/api/units', (req, res) => {
+  try {
+    const { block_id, number } = req.body;
+    if (!block_id || !number) {
+      return res.status(400).json({ error: 'Bloco e número da unidade são obrigatórios.' });
+    }
+    const created = residentDAO.createUnit(req.body);
+    res.status(201).json(created);
+  } catch (err) {
+    const status = /já existe|já está|duplicad/i.test(err.message) ? 409 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/units/:id', (req, res) => {
+  try {
+    const unit = residentDAO.getUnit(req.params.id);
+    if (!unit) return res.status(404).json({ error: 'Unidade não encontrada.' });
+    res.json(unit);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/units/:id', (req, res) => {
+  try {
+    const updated = residentDAO.updateUnit(req.params.id, req.body);
+    res.json(updated);
+  } catch (err) {
+    const status = /já existe|duplicad/i.test(err.message) ? 409 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.delete('/api/units/:id', (req, res) => {
+  try {
+    residentDAO.deleteUnit(req.params.id);
+    res.json({ message: 'Unidade excluída com sucesso.' });
+  } catch (err) {
+    const status = /possui|vinculad|histórico/i.test(err.message) ? 409 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 app.get('/api/residents', (req, res) => {
   try {
     const { unit_id, search } = req.query;
-    const residents = residentDAO.getResidents({ unit_id, search });
+    const residents = residentDAO.getResidents({ condominiumId: req.condominiumId, unit_id, search });
     res.json(residents);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -207,7 +254,7 @@ app.delete('/api/residents/:id', (req, res) => {
 
 app.get('/api/vehicles', (req, res) => {
   try {
-    const vehicles = residentDAO.getVehicles();
+    const vehicles = residentDAO.getVehicles({ condominiumId: req.condominiumId });
     res.json(vehicles);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -229,7 +276,7 @@ app.post('/api/vehicles', (req, res) => {
 
 app.get('/api/pets', (req, res) => {
   try {
-    const pets = residentDAO.getPets();
+    const pets = residentDAO.getPets({ condominiumId: req.condominiumId });
     res.json(pets);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -241,7 +288,7 @@ app.get('/api/pets', (req, res) => {
 // ==========================================
 app.get('/api/spaces', (req, res) => {
   try {
-    const spaces = spaceDAO.getSpaces();
+    const spaces = spaceDAO.getSpaces({ condominiumId: req.condominiumId });
     res.json(spaces);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -251,7 +298,7 @@ app.get('/api/spaces', (req, res) => {
 app.get('/api/reservations', (req, res) => {
   try {
     const { space_id, date } = req.query;
-    const reservations = spaceDAO.getReservations({ space_id, date });
+    const reservations = spaceDAO.getReservations({ condominiumId: req.condominiumId, space_id, date });
     res.json(reservations);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -287,7 +334,7 @@ app.patch('/api/reservations/:id/cancel', (req, res) => {
 app.get('/api/financial/transactions', (req, res) => {
   try {
     const { status, type, search } = req.query;
-    const txs = financialDAO.getTransactions({ status, type, search });
+    const txs = financialDAO.getTransactions({ condominiumId: req.condominiumId, status, type, search });
     res.json(txs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -296,7 +343,7 @@ app.get('/api/financial/transactions', (req, res) => {
 
 app.get('/api/financial/summary', (req, res) => {
   try {
-    const summary = financialDAO.getSummary();
+    const summary = financialDAO.getSummary({ condominiumId: req.condominiumId });
     res.json(summary);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -309,7 +356,7 @@ app.post('/api/financial/transactions', (req, res) => {
     if (!type || !category || !description || !amount || !due_date) {
       return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
     }
-    const created = financialDAO.createTransaction(req.body);
+    const created = financialDAO.createTransaction({ condominium_id: req.condominiumId, ...req.body });
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -342,7 +389,7 @@ app.get('/api/financial/report', (req, res) => {
 app.get('/api/announcements', (req, res) => {
   try {
     const { category, search } = req.query;
-    const announcements = announcementDAO.getAnnouncements({ category, search });
+    const announcements = announcementDAO.getAnnouncements({ condominiumId: req.condominiumId, category, search });
     res.json(announcements);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -355,7 +402,7 @@ app.post('/api/announcements', (req, res) => {
     if (!title || !content) {
       return res.status(400).json({ error: 'Título e conteúdo são obrigatórios.' });
     }
-    const created = announcementDAO.createAnnouncement(req.body);
+    const created = announcementDAO.createAnnouncement({ condominium_id: req.condominiumId, ...req.body });
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -378,7 +425,7 @@ app.delete('/api/announcements/:id', (req, res) => {
 app.get('/api/market/products', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
     const { category, search } = req.query;
-    const products = marketDAO.getProducts({ category, search });
+    const products = marketDAO.getProducts({ condominiumId: req.condominiumId, category, search });
     res.json(products);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -391,7 +438,7 @@ app.post('/api/market/products', checkFeature('ENABLE_MARKETPLACE'), (req, res) 
     if (!name || (!price && price !== 0)) {
       return res.status(400).json({ error: 'Nome e preço são obrigatórios.' });
     }
-    const created = marketDAO.createProduct(req.body);
+    const created = marketDAO.createProduct({ condominium_id: req.condominiumId, ...req.body });
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -424,7 +471,7 @@ app.post('/api/market/checkout', checkFeature('ENABLE_MARKETPLACE'), (req, res) 
 
 app.get('/api/market/sales', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
-    const sales = marketDAO.getSales();
+    const sales = marketDAO.getSales({ condominiumId: req.condominiumId });
     res.json(sales);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -447,5 +494,5 @@ app.patch('/api/config/features', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor Praticon ERP (SQLite + GoF + LPS) online em http://localhost:${PORT}`);
+  console.log(`🚀 Servidor Praticon ERP (SQLite + GoF + LPS + Multi-Tenant Context) online em http://localhost:${PORT}`);
 });
