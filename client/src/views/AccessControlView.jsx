@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ShieldCheck, 
-  UserPlus, 
-  LogOut, 
-  Search, 
-  Car, 
-  UserCheck, 
-  Clock, 
-  X, 
+import {
+  ShieldCheck,
+  UserPlus,
+  LogOut,
+  Search,
+  Car,
+  UserCheck,
+  Clock,
+  X,
   CheckCircle,
   Building,
   Briefcase,
@@ -100,7 +100,7 @@ export default function AccessControlView({ showToast }) {
     }
   };
 
-  const activeCount = logs.filter(l => l.status === 'inside').length;
+  const activeCount = logs.filter(l => l.status === 'IN_PROPERTY').length;
 
   return (
     <div>
@@ -141,9 +141,9 @@ export default function AccessControlView({ showToast }) {
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', flex: 1, maxWidth: '420px' }}>
           <div className="search-box" style={{ width: '100%' }}>
             <Search size={16} />
-            <input 
-              type="text" 
-              placeholder="Buscar por nome, documento, placa, empresa..." 
+            <input
+              type="text"
+              placeholder="Buscar por nome, documento, placa, empresa..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -152,19 +152,19 @@ export default function AccessControlView({ showToast }) {
         </form>
 
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <select 
-            className="form-control" 
+          <select
+            className="form-control"
             style={{ width: '170px' }}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">Todos os Status</option>
-            <option value="inside">Dentro do Prédio</option>
-            <option value="exited">Já Saíram</option>
+            <option value="IN_PROPERTY">Dentro do Prédio</option>
+            <option value="EXITED">Já Saíram</option>
           </select>
 
-          <select 
-            className="form-control" 
+          <select
+            className="form-control"
             style={{ width: '180px' }}
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -212,10 +212,9 @@ export default function AccessControlView({ showToast }) {
                       )}
                     </td>
                     <td>
-                      <span className={`badge ${
-                        log.type === 'Visitante' ? 'badge-purple' : 
-                        log.type === 'Prestador de Serviço' ? 'badge-warning' : 'badge-info'
-                      }`}>
+                      <span className={`badge ${log.type === 'Visitante' ? 'badge-purple' :
+                          log.type === 'Prestador de Serviço' ? 'badge-warning' : 'badge-info'
+                        }`}>
                         {log.type}
                       </span>
                     </td>
@@ -236,7 +235,7 @@ export default function AccessControlView({ showToast }) {
                       </div>
                     </td>
                     <td>
-                      {log.status === 'inside' ? (
+                      {log.status === 'IN_PROPERTY' ? (
                         <span className="badge badge-warning">
                           <Clock size={12} /> No Condomínio
                         </span>
@@ -247,8 +246,8 @@ export default function AccessControlView({ showToast }) {
                       )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      {log.status === 'inside' ? (
-                        <button 
+                      {log.status === 'IN_PROPERTY' ? (
+                        <button
                           className="btn btn-danger btn-sm"
                           onClick={() => handleExit(log.id, log.visitor_name)}
                         >
@@ -283,11 +282,11 @@ export default function AccessControlView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Nome Completo *</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      required 
-                      placeholder="Ex: João Carlos Silveira" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      required
+                      placeholder="Ex: João Carlos Silveira"
                       value={formData.visitor_name}
                       onChange={(e) => setFormData({ ...formData, visitor_name: e.target.value })}
                     />
@@ -295,11 +294,11 @@ export default function AccessControlView({ showToast }) {
 
                   <div className="form-group">
                     <label>Documento (RG / CPF) *</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      required 
-                      placeholder="Ex: 12.345.678-9" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      required
+                      placeholder="Ex: 12.345.678-9"
                       value={formData.document}
                       onChange={(e) => setFormData({ ...formData, document: e.target.value })}
                     />
@@ -309,7 +308,7 @@ export default function AccessControlView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Tipo de Entrada *</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.type}
                       onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -323,10 +322,10 @@ export default function AccessControlView({ showToast }) {
 
                   <div className="form-group">
                     <label>Empresa / Prestador</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="Ex: Enel, Net, iFood..." 
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ex: Enel, Net, iFood..."
                       value={formData.company}
                       onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                     />
@@ -336,7 +335,7 @@ export default function AccessControlView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Unidade de Destino</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.unit_id}
                       onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
@@ -350,10 +349,10 @@ export default function AccessControlView({ showToast }) {
 
                   <div className="form-group">
                     <label>Placa do Veículo (Se houver)</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="Ex: BRA2E19" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ex: BRA2E19"
                       value={formData.vehicle_plate}
                       onChange={(e) => setFormData({ ...formData, vehicle_plate: e.target.value.toUpperCase() })}
                     />
@@ -362,10 +361,10 @@ export default function AccessControlView({ showToast }) {
 
                 <div className="form-group">
                   <label>Autorizado Por (Morador / Portaria)</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Ex: Carlos Eduardo (Apto 101-A)" 
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ex: Carlos Eduardo (Apto 101-A)"
                     value={formData.authorized_by}
                     onChange={(e) => setFormData({ ...formData, authorized_by: e.target.value })}
                   />
@@ -373,9 +372,9 @@ export default function AccessControlView({ showToast }) {
 
                 <div className="form-group">
                   <label>Observações / Motivo da Visita</label>
-                  <textarea 
-                    className="form-control" 
-                    rows="2" 
+                  <textarea
+                    className="form-control"
+                    rows="2"
                     placeholder="Ex: Manutenção elétrica autorizada pelo morador"
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
