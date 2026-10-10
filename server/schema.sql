@@ -229,3 +229,8 @@ CREATE INDEX IF NOT EXISTS idx_financial_status ON financial_transactions(status
 CREATE INDEX IF NOT EXISTS idx_market_sale_items_sale ON market_sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_blocks_condominium ON blocks(condominium_id);
 CREATE INDEX IF NOT EXISTS idx_units_block ON units(block_id);
+
+-- Seed: Condomínio padrão (criado apenas se a tabela estiver vazia)
+INSERT INTO condominiums (id, name, status)
+SELECT 1, 'Condomínio Padrão', 'ACTIVE'
+WHERE NOT EXISTS (SELECT 1 FROM condominiums);
