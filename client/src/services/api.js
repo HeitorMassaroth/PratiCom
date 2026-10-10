@@ -85,6 +85,7 @@ export const api = {
     return request(`/residents${qs ? '?' + qs : ''}`);
   },
   createResident: (data) => request('/residents', { method: 'POST', body: JSON.stringify(data) }),
+  updateResident: (id, data) => request(`/residents/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteResident: (id) => request(`/residents/${id}`, { method: 'DELETE' }),
   getVehicles: () => request('/vehicles'),
   createVehicle: (data) => request('/vehicles', { method: 'POST', body: JSON.stringify(data) }),

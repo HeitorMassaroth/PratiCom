@@ -242,6 +242,20 @@ app.post('/api/residents', (req, res) => {
   }
 });
 
+app.patch('/api/residents/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.body.name) {
+      return res.status(400).json({ error: 'Nome é obrigatório.' });
+    }
+    const updated = residentDAO.updateResident(id, req.body);
+    res.json(updated);
+  } catch (err) {
+    const status = /não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 app.delete('/api/residents/:id', (req, res) => {
   try {
     const { id } = req.params;

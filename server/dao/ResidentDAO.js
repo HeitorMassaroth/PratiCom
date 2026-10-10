@@ -220,6 +220,31 @@ export class ResidentDAO {
     return { ...resident, block: unit.block || '', unit_number: unit.number || '' };
   }
 
+  updateResident(id, data) {
+    const rId = parseInt(id, 10);
+    const existing = this.db.prepare('SELECT * FROM residents WHERE id = ?').get(rId);
+    if (!existing) throw new Error('Morador não encontrado.');
+
+    this.db.prepare(`
+      UPDATE residents
+      SET unit_id = ?, name = ?, email = ?, phone = ?, cpf = ?, role = ?, emergency_contact = ?
+      WHERE id = ?
+    `).run(
+      data.unit_id ? parseInt(data.unit_id, 10) : existing.unit_id,
+      data.name || existing.name,
+      data.email !== undefined ? data.email || null : existing.email,
+      data.phone !== undefined ? data.phone || null : existing.phone,
+      data.cpf !== undefined ? data.cpf || null : existing.cpf,
+      data.role || existing.role,
+      data.emergency_contact !== undefined ? data.emergency_contact || null : existing.emergency_contact,
+      rId
+    );
+
+    const updated = this.db.prepare('SELECT * FROM residents WHERE id = ?').get(rId);
+    const unit = this.db.prepare('SELECT block, number FROM units WHERE id = ?').get(updated.unit_id) || {};
+    return { ...updated, block: unit.block || '', unit_number: unit.number || '' };
+  }
+
   deleteResident(id) {
     const stmt = this.db.prepare('DELETE FROM residents WHERE id = ?');
     const info = stmt.run(parseInt(id, 10));
