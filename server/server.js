@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { models } from './database.js';
+import { DAOFactory } from './dao/DAOFactory.js';
+import AppConfigSingleton from './config/AppConfigSingleton.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -8,15 +9,53 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// DAOs instanciadas via Padrão FACTORY METHOD
+const residentDAO = DAOFactory.getDAO('resident');
+const deliveryDAO = DAOFactory.getDAO('delivery');
+const accessDAO = DAOFactory.getDAO('access');
+const spaceDAO = DAOFactory.getDAO('reservation');
+const financialDAO = DAOFactory.getDAO('financial');
+const announcementDAO = DAOFactory.getDAO('announcement');
+const marketDAO = DAOFactory.getDAO('market');
+
+// Middleware para Feature Flags (LPS)
+const checkFeature = (featureName) => (req, res, next) => {
+  if (!AppConfigSingleton.isFeatureEnabled(featureName)) {
+    return res.status(403).json({ error: `A funcionalidade '${featureName}' está desativada na configuração (LPS).` });
+  }
+  next();
+};
+
 // ==========================================
 // 1. DASHBOARD & MÉTRICAS CONSOLIDADAS
 // ==========================================
 app.get('/api/dashboard', async (req, res) => {
   try {
-    const data = models.getDashboardData();
+    const deliveries = deliveryDAO.getDeliveries();
+    const pendingDeliveries = deliveries.filter(d => d.status === 'pending' || d.status === 'PENDING');
+    const accessLogs = accessDAO.getAccessLogs();
+    const activeAccess = accessLogs.filter(a => a.status === 'IN_PROPERTY' || a.status === 'inside');
+    const summary = financialDAO.getSummary();
+    const announcements = announcementDAO.getAnnouncements();
+    const urgentAnnouncements = announcements.filter(a => a.priority === 'URGENTE' || a.priority === 'high');
+    const reservations = spaceDAO.getReservations();
+
+    const data = {
+      metrics: {
+        pendingDeliveries: pendingDeliveries.length,
+        activeAccess: activeAccess.length,
+        overdueAmount: summary.default_amount || 0,
+        defaultRate: summary.default_rate || 0
+      },
+      recentAccess: activeAccess.slice(0, 5),
+      recentDeliveries: pendingDeliveries.slice(0, 5),
+      urgentAnnouncements,
+      upcomingReservations: reservations.slice(0, 5)
+    };
+
     res.json(data);
   } catch (err) {
-    console.error(err);
+    console.error('Erro no Dashboard:', err);
     res.status(500).json({ error: 'Erro ao carregar dados do dashboard.' });
   }
 });
@@ -27,7 +66,7 @@ app.get('/api/dashboard', async (req, res) => {
 app.get('/api/deliveries', (req, res) => {
   try {
     const { status, unit_id } = req.query;
-    const deliveries = models.getDeliveries({ status, unit_id });
+    const deliveries = deliveryDAO.getDeliveries({ status, unit_id });
     res.json(deliveries);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -36,11 +75,11 @@ app.get('/api/deliveries', (req, res) => {
 
 app.post('/api/deliveries', (req, res) => {
   try {
-    const { unit_id, resident_id, courier, tracking_code, description, notes } = req.body;
+    const { unit_id, courier } = req.body;
     if (!unit_id || !courier) {
       return res.status(400).json({ error: 'Unidade e transportadora são obrigatórios.' });
     }
-    const created = models.createDelivery(req.body);
+    const created = deliveryDAO.createDelivery(req.body);
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -51,7 +90,12 @@ app.patch('/api/deliveries/:id/pickup', (req, res) => {
   try {
     const { id } = req.params;
     const { pickup_code, picked_up_by } = req.body;
-    const updated = models.pickupDelivery(id, { pickup_code, picked_up_by });
+    
+    // Respeita Feature Flag de Notificação Avançada com PIN (LPS)
+    const isAdvanced = AppConfigSingleton.isFeatureEnabled('ENABLE_ADVANCED_DELIVERIES');
+    const codeToVerify = isAdvanced ? pickup_code : null;
+
+    const updated = deliveryDAO.pickupDelivery(id, { pickup_code: codeToVerify, picked_up_by });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -64,7 +108,7 @@ app.patch('/api/deliveries/:id/pickup', (req, res) => {
 app.get('/api/access', (req, res) => {
   try {
     const { status, type, search } = req.query;
-    const logs = models.getAccessLogs({ status, type, search });
+    const logs = accessDAO.getAccessLogs({ status, type, search });
     res.json(logs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -73,11 +117,11 @@ app.get('/api/access', (req, res) => {
 
 app.post('/api/access/entry', (req, res) => {
   try {
-    const { visitor_name, document, type } = req.body;
+    const { visitor_name, document } = req.body;
     if (!visitor_name || !document) {
       return res.status(400).json({ error: 'Nome e documento são obrigatórios.' });
     }
-    const created = models.registerEntry(req.body);
+    const created = accessDAO.registerEntry(req.body);
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -87,7 +131,7 @@ app.post('/api/access/entry', (req, res) => {
 app.patch('/api/access/:id/exit', (req, res) => {
   try {
     const { id } = req.params;
-    const updated = models.registerExit(id);
+    const updated = accessDAO.registerExit(id);
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -99,7 +143,7 @@ app.patch('/api/access/:id/exit', (req, res) => {
 // ==========================================
 app.get('/api/units', (req, res) => {
   try {
-    const units = models.getUnits();
+    const units = residentDAO.getUnits();
     res.json(units);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -109,7 +153,7 @@ app.get('/api/units', (req, res) => {
 app.get('/api/residents', (req, res) => {
   try {
     const { unit_id, search } = req.query;
-    const residents = models.getResidents({ unit_id, search });
+    const residents = residentDAO.getResidents({ unit_id, search });
     res.json(residents);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -122,7 +166,7 @@ app.post('/api/residents', (req, res) => {
     if (!unit_id || !name) {
       return res.status(400).json({ error: 'Unidade e nome são obrigatórios.' });
     }
-    const created = models.createResident(req.body);
+    const created = residentDAO.createResident(req.body);
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -132,7 +176,7 @@ app.post('/api/residents', (req, res) => {
 app.delete('/api/residents/:id', (req, res) => {
   try {
     const { id } = req.params;
-    models.deleteResident(id);
+    residentDAO.deleteResident(id);
     res.json({ message: 'Morador removido com sucesso.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -141,7 +185,7 @@ app.delete('/api/residents/:id', (req, res) => {
 
 app.get('/api/vehicles', (req, res) => {
   try {
-    const vehicles = models.getVehicles();
+    const vehicles = residentDAO.getVehicles();
     res.json(vehicles);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -154,7 +198,7 @@ app.post('/api/vehicles', (req, res) => {
     if (!unit_id || !plate || !model) {
       return res.status(400).json({ error: 'Unidade, placa e modelo do veículo são obrigatórios.' });
     }
-    const created = models.createVehicle(req.body);
+    const created = residentDAO.createVehicle(req.body);
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -163,7 +207,7 @@ app.post('/api/vehicles', (req, res) => {
 
 app.get('/api/pets', (req, res) => {
   try {
-    const pets = models.getPets();
+    const pets = residentDAO.getPets();
     res.json(pets);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -171,11 +215,11 @@ app.get('/api/pets', (req, res) => {
 });
 
 // ==========================================
-// 5. RESERVAS (REGRA: 1 HORA POR PESSOA/DIA)
+// 5. RESERVAS DE ESPAÇOS COMUNS
 // ==========================================
 app.get('/api/spaces', (req, res) => {
   try {
-    const spaces = models.getSpaces();
+    const spaces = spaceDAO.getSpaces();
     res.json(spaces);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -184,8 +228,8 @@ app.get('/api/spaces', (req, res) => {
 
 app.get('/api/reservations', (req, res) => {
   try {
-    const { date, space_id, resident_id } = req.query;
-    const reservations = models.getReservations({ date, space_id, resident_id });
+    const { space_id, date } = req.query;
+    const reservations = spaceDAO.getReservations({ space_id, date });
     res.json(reservations);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -198,7 +242,7 @@ app.post('/api/reservations', (req, res) => {
     if (!space_id || !resident_id || !unit_id || !reservation_date || !start_time || !end_time) {
       return res.status(400).json({ error: 'Todos os campos de espaço, morador, data e horário são obrigatórios.' });
     }
-    const created = models.createReservation(req.body);
+    const created = spaceDAO.createReservation(req.body);
     res.status(201).json(created);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -208,7 +252,7 @@ app.post('/api/reservations', (req, res) => {
 app.patch('/api/reservations/:id/cancel', (req, res) => {
   try {
     const { id } = req.params;
-    models.cancelReservation(id);
+    spaceDAO.cancelReservation(id);
     res.json({ message: 'Reserva cancelada com sucesso.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -216,12 +260,12 @@ app.patch('/api/reservations/:id/cancel', (req, res) => {
 });
 
 // ==========================================
-// 6. FINANCEIRO
+// 6. FINANCEIRO CONDOMINIAL
 // ==========================================
 app.get('/api/financial/transactions', (req, res) => {
   try {
-    const { type, status, unit_id, category } = req.query;
-    const txs = models.getFinancialTransactions({ type, status, unit_id, category });
+    const { status, type, search } = req.query;
+    const txs = financialDAO.getTransactions({ status, type, search });
     res.json(txs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -230,7 +274,7 @@ app.get('/api/financial/transactions', (req, res) => {
 
 app.get('/api/financial/summary', (req, res) => {
   try {
-    const summary = models.getFinancialSummary();
+    const summary = financialDAO.getSummary();
     res.json(summary);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -243,7 +287,7 @@ app.post('/api/financial/transactions', (req, res) => {
     if (!type || !category || !description || !amount || !due_date) {
       return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
     }
-    const created = models.createFinancialTransaction(req.body);
+    const created = financialDAO.createTransaction(req.body);
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -253,20 +297,30 @@ app.post('/api/financial/transactions', (req, res) => {
 app.patch('/api/financial/transactions/:id/pay', (req, res) => {
   try {
     const { id } = req.params;
-    const updated = models.payFinancialTransaction(id);
+    const updated = financialDAO.payTransaction(id);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Endpoint extra para relatório via Template Method
+app.get('/api/financial/report', (req, res) => {
+  try {
+    const report = financialDAO.generateReport();
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==========================================
-// 7. COMUNICADOS
+// 7. MURAL DE COMUNICADOS
 // ==========================================
 app.get('/api/announcements', (req, res) => {
   try {
-    const { category, priority } = req.query;
-    const announcements = models.getAnnouncements({ category, priority });
+    const { category, search } = req.query;
+    const announcements = announcementDAO.getAnnouncements({ category, search });
     res.json(announcements);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -279,7 +333,7 @@ app.post('/api/announcements', (req, res) => {
     if (!title || !content) {
       return res.status(400).json({ error: 'Título e conteúdo são obrigatórios.' });
     }
-    const created = models.createAnnouncement(req.body);
+    const created = announcementDAO.createAnnouncement(req.body);
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -289,7 +343,7 @@ app.post('/api/announcements', (req, res) => {
 app.delete('/api/announcements/:id', (req, res) => {
   try {
     const { id } = req.params;
-    models.deleteAnnouncement(id);
+    announcementDAO.deleteAnnouncement(id);
     res.json({ message: 'Comunicado excluído com sucesso.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -297,64 +351,79 @@ app.delete('/api/announcements/:id', (req, res) => {
 });
 
 // ==========================================
-// 8. MERCADINHO (ESTOQUE & PDV AUTOATENDIMENTO)
+// 8. MERCADINHO AUTÔNOMO (LPS: ENABLE_MARKETPLACE)
 // ==========================================
-app.get('/api/market/products', (req, res) => {
+app.get('/api/market/products', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
-    const { category, low_stock } = req.query;
-    const products = models.getMarketProducts({ category, low_stock });
+    const { category, search } = req.query;
+    const products = marketDAO.getProducts({ category, search });
     res.json(products);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/market/products', (req, res) => {
+app.post('/api/market/products', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
-    const { name, sale_price } = req.body;
-    if (!name || !sale_price) {
-      return res.status(400).json({ error: 'Nome e preço de venda são obrigatórios.' });
+    const { name, price } = req.body;
+    if (!name || (!price && price !== 0)) {
+      return res.status(400).json({ error: 'Nome e preço são obrigatórios.' });
     }
-    const created = models.createMarketProduct(req.body);
+    const created = marketDAO.createProduct(req.body);
     res.status(201).json(created);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.patch('/api/market/products/:id/stock', (req, res) => {
+app.patch('/api/market/products/:id/stock', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
     const { id } = req.params;
-    const { delta, new_quantity } = req.body;
-    const updated = models.updateMarketStock(id, { delta, new_quantity });
+    const { quantity, action } = req.body;
+    const updated = marketDAO.updateStock(id, { quantity, action });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.post('/api/market/checkout', (req, res) => {
+app.post('/api/market/checkout', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
-    const { items, payment_method, unit_id, resident_name } = req.body;
+    const { items, payment_method, unit_id, resident_id, total_amount } = req.body;
     if (!items || items.length === 0) {
-      return res.status(400).json({ error: 'Carrinho vazio.' });
+      return res.status(400).json({ error: 'Carrinho de compras vazio.' });
     }
-    const result = models.checkoutMarket({ items, payment_method, unit_id, resident_name });
+    const result = marketDAO.checkout({ unit_id, resident_id, total_amount, payment_method, items });
     res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.get('/api/market/sales', (req, res) => {
+app.get('/api/market/sales', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
-    const sales = models.getMarketSales();
+    const sales = marketDAO.getSales();
     res.json(sales);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Endpoint de controle de Feature Flags (LPS)
+app.get('/api/config/features', (req, res) => {
+  res.json(AppConfigSingleton.getFeatures());
+});
+
+app.patch('/api/config/features', (req, res) => {
+  try {
+    const { feature, enabled } = req.body;
+    AppConfigSingleton.updateFeature(feature, enabled);
+    res.json({ message: `Feature '${feature}' atualizada para ${enabled}.`, features: AppConfigSingleton.getFeatures() });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor Praticon ERP online na porta http://localhost:${PORT}`);
+  console.log(`🚀 Servidor Praticon ERP (SQLite + GoF + LPS) online em http://localhost:${PORT}`);
 });
