@@ -87,4 +87,9 @@ export const api = {
   updateMarketStock: (id, data) => request(`/market/products/${id}/stock`, { method: 'PATCH', body: JSON.stringify(data) }),
   checkoutMarket: (data) => request('/market/checkout', { method: 'POST', body: JSON.stringify(data) }),
   getMarketSales: () => request('/market/sales'),
+
+  // Configuração LPS
+  getFeatures: () => request('/config/features'),
+  updateFeature: (feature, enabled) => request('/config/features', { method: 'PATCH', body: JSON.stringify({ feature, enabled }) })
 };
+
