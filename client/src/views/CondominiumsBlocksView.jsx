@@ -11,7 +11,7 @@ const emptyCondominium = {
 
 export default function CondominiumsBlocksView({ showToast }) {
   const [condominiums, setCondominiums] = useState([]);
-  const [selected, setSelected] = useState('');
+  const [selected, setSelected] = useState(() => api.getActiveCondominiumId() || '');
   const [blocks, setBlocks] = useState([]);
   const [units, setUnits] = useState([]);
   const [pendingUnits, setPendingUnits] = useState([]);
@@ -48,7 +48,12 @@ export default function CondominiumsBlocksView({ showToast }) {
       setCondominiums(items || []); 
       setPendingUnits(pending || []);
       
-      const current = selected || (items && items[0]?.id ? String(items[0].id) : '');
+      // Mantém o selecionado atual se ainda existir na lista;
+      // só cai pro primeiro se não houver nenhum selecionado.
+      const storedId = api.getActiveCondominiumId();
+      const stillExists = items?.some(c => String(c.id) === storedId);
+      const current = stillExists ? storedId : (items?.[0]?.id ? String(items[0].id) : '');
+
       if (current) { 
         setSelected(current); 
         api.setActiveCondominiumId(current);
