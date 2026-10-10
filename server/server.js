@@ -17,6 +17,28 @@ const spaceDAO = DAOFactory.getDAO('reservation');
 const financialDAO = DAOFactory.getDAO('financial');
 const announcementDAO = DAOFactory.getDAO('announcement');
 const marketDAO = DAOFactory.getDAO('market');
+const condominiumDAO = DAOFactory.getDAO('condominium');
+
+const territoryError = (res, err) => {
+  const message = err.message || 'Erro ao processar operação territorial.';
+  const status = /não encontrado/i.test(message) ? 404 : /excluir|duplicad|restri/i.test(message) ? 409 : 400;
+  return res.status(status).json({ error: message });
+};
+
+app.get('/api/condominiums', (req, res) => { try { res.json(condominiumDAO.getCondominiums({ status: req.query.status })); } catch (err) { territoryError(res, err); } });
+app.post('/api/condominiums', (req, res) => { try { res.status(201).json(condominiumDAO.createCondominium(req.body)); } catch (err) { territoryError(res, err); } });
+app.get('/api/condominiums/:id', (req, res) => { try { const value = condominiumDAO.getCondominium(req.params.id); if (!value) return res.status(404).json({ error: 'Condomínio não encontrado.' }); res.json(value); } catch (err) { territoryError(res, err); } });
+app.patch('/api/condominiums/:id', (req, res) => { try { res.json(condominiumDAO.updateCondominium(req.params.id, req.body)); } catch (err) { territoryError(res, err); } });
+app.patch('/api/condominiums/:id/status', (req, res) => { try { res.json(condominiumDAO.setCondominiumStatus(req.params.id, req.body.status)); } catch (err) { territoryError(res, err); } });
+app.delete('/api/condominiums/:id', (req, res) => { try { condominiumDAO.deleteCondominium(req.params.id); res.status(204).end(); } catch (err) { territoryError(res, err); } });
+app.get('/api/condominiums/:id/blocks', (req, res) => { try { res.json(condominiumDAO.getBlocks(req.params.id)); } catch (err) { territoryError(res, err); } });
+app.post('/api/condominiums/:id/blocks', (req, res) => { try { res.status(201).json(condominiumDAO.createBlock(req.params.id, req.body)); } catch (err) { territoryError(res, err); } });
+app.get('/api/blocks/:id', (req, res) => { try { const value = condominiumDAO.getBlock(req.params.id); if (!value) return res.status(404).json({ error: 'Bloco não encontrado.' }); res.json(value); } catch (err) { territoryError(res, err); } });
+app.patch('/api/blocks/:id', (req, res) => { try { res.json(condominiumDAO.updateBlock(req.params.id, req.body)); } catch (err) { territoryError(res, err); } });
+app.patch('/api/blocks/:id/status', (req, res) => { try { res.json(condominiumDAO.setBlockStatus(req.params.id, req.body.status)); } catch (err) { territoryError(res, err); } });
+app.delete('/api/blocks/:id', (req, res) => { try { condominiumDAO.deleteBlock(req.params.id); res.status(204).end(); } catch (err) { territoryError(res, err); } });
+app.get('/api/territory/pending-units', (req, res) => { try { res.json(condominiumDAO.getPendingUnits()); } catch (err) { territoryError(res, err); } });
+app.patch('/api/blocks/:id/map-legacy-units', (req, res) => { try { res.json(condominiumDAO.mapPendingUnits(req.params.id, req.body.legacy_block)); } catch (err) { territoryError(res, err); } });
 
 // Middleware para Feature Flags (LPS)
 const checkFeature = (featureName) => (req, res, next) => {

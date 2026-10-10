@@ -22,6 +22,9 @@ class DatabaseSingleton {
     this.db = new Database(dbPath);
     this.db.pragma('foreign_keys = ON');
 
+    // Compatibiliza bancos existentes antes de criar índices do schema novo.
+    this.applyTerritorialCompatibilityMigration();
+
     // Executa schema DDL se o banco foi criado
     if (fs.existsSync(schemaPath)) {
       const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
@@ -33,6 +36,24 @@ class DatabaseSingleton {
 
   getDb() {
     return this.db;
+  }
+
+  applyTerritorialCompatibilityMigration() {
+    const addColumnIfMissing = (table, definition) => {
+      const column = definition.split(/\s+/)[0];
+      const tableExists = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+      if (!tableExists) return;
+      const exists = this.db.prepare(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`).get(column);
+      if (!exists) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+    };
+
+    // Colunas anuláveis preservam o legado até o administrador confirmar os vínculos reais.
+    addColumnIfMissing('units', 'block_id INTEGER');
+    addColumnIfMissing('spaces', 'condominium_id INTEGER');
+    addColumnIfMissing('financial_transactions', 'condominium_id INTEGER');
+    addColumnIfMissing('announcements', 'condominium_id INTEGER');
+    addColumnIfMissing('announcements', 'block_id INTEGER');
+    addColumnIfMissing('market_products', 'condominium_id INTEGER');
   }
 }
 

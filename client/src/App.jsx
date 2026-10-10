@@ -9,6 +9,7 @@ import ResidentsView from './views/ResidentsView';
 import ReservationsView from './views/ReservationsView';
 import AnnouncementsView from './views/AnnouncementsView';
 import MarketInventoryView from './views/MarketInventoryView';
+import CondominiumsBlocksView from './views/CondominiumsBlocksView';
 import { api } from './services/api';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
@@ -111,6 +112,8 @@ export default function App() {
           {currentView === 'market' && (
             <MarketInventoryView showToast={showToast} />
           )}
+
+          {currentView === 'territory' && <CondominiumsBlocksView showToast={showToast} />}
         </main>
       </div>
 

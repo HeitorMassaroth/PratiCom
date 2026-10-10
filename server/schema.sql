@@ -1,15 +1,43 @@
 -- Schema DDL para Banco de Dados Relacional SQLite do Praticom ERP
 PRAGMA foreign_keys = ON;
 
+-- 1. Condomínios
+CREATE TABLE IF NOT EXISTS condominiums (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    cnpj TEXT UNIQUE,
+    address TEXT,
+    city TEXT,
+    state TEXT,
+    postal_code TEXT,
+    phone TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Blocos
+CREATE TABLE IF NOT EXISTS blocks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    condominium_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(condominium_id, name),
+    FOREIGN KEY (condominium_id) REFERENCES condominiums(id) ON DELETE RESTRICT
+);
+
 -- 1. Unidades Condominiais
 CREATE TABLE IF NOT EXISTS units (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     block TEXT NOT NULL,
+    block_id INTEGER,
     number TEXT NOT NULL,
     floor INTEGER,
     type TEXT DEFAULT 'Residencial',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(block, number)
+    UNIQUE(block, number),
+    FOREIGN KEY (block_id) REFERENCES blocks(id) ON DELETE RESTRICT
 );
 
 -- 2. Moradores
@@ -88,11 +116,13 @@ CREATE TABLE IF NOT EXISTS access_logs (
 -- 7. Espaços Comuns
 CREATE TABLE IF NOT EXISTS spaces (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    condominium_id INTEGER,
     name TEXT NOT NULL,
     description TEXT,
     capacity INTEGER NOT NULL,
     price_per_hour REAL DEFAULT 0,
-    rules TEXT
+    rules TEXT,
+    FOREIGN KEY (condominium_id) REFERENCES condominiums(id) ON DELETE RESTRICT
 );
 
 -- 8. Reservas de Espaços
@@ -115,6 +145,7 @@ CREATE TABLE IF NOT EXISTS reservations (
 -- 9. Transações Financeiras
 CREATE TABLE IF NOT EXISTS financial_transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    condominium_id INTEGER,
     unit_id INTEGER,
     description TEXT NOT NULL,
     amount REAL NOT NULL,
@@ -123,12 +154,15 @@ CREATE TABLE IF NOT EXISTS financial_transactions (
     status TEXT DEFAULT 'PENDING',
     due_date DATE NOT NULL,
     paid_at DATETIME,
-    FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL
+    FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE SET NULL,
+    FOREIGN KEY (condominium_id) REFERENCES condominiums(id) ON DELETE RESTRICT
 );
 
 -- 10. Mural de Comunicados
 CREATE TABLE IF NOT EXISTS announcements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    condominium_id INTEGER,
+    block_id INTEGER,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
     category TEXT DEFAULT 'Geral',
@@ -137,17 +171,21 @@ CREATE TABLE IF NOT EXISTS announcements (
     target_block TEXT DEFAULT 'Todos',
     is_pinned INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    expires_at DATE
+    expires_at DATE,
+    FOREIGN KEY (condominium_id) REFERENCES condominiums(id) ON DELETE RESTRICT,
+    FOREIGN KEY (block_id) REFERENCES blocks(id) ON DELETE RESTRICT
 );
 
 -- 11. Mercadinho - Produtos
 CREATE TABLE IF NOT EXISTS market_products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    condominium_id INTEGER,
     name TEXT NOT NULL,
     category TEXT NOT NULL,
     price REAL NOT NULL,
     stock_quantity INTEGER DEFAULT 0,
-    barcode TEXT
+    barcode TEXT,
+    FOREIGN KEY (condominium_id) REFERENCES condominiums(id) ON DELETE RESTRICT
 );
 
 -- 12. Mercadinho - Vendas (PDV)
@@ -189,3 +227,5 @@ CREATE INDEX IF NOT EXISTS idx_access_status ON access_logs(status);
 CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(reservation_date);
 CREATE INDEX IF NOT EXISTS idx_financial_status ON financial_transactions(status);
 CREATE INDEX IF NOT EXISTS idx_market_sale_items_sale ON market_sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_blocks_condominium ON blocks(condominium_id);
+CREATE INDEX IF NOT EXISTS idx_units_block ON units(block_id);

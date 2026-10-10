@@ -1,6 +1,28 @@
 # 0md — Plano de ação para eliminar persistência e dependências internas de JSON
 
-**Status:** executado em 10/10/2026. `features.json`, o importador legado e a coluna `items_json` foram removidos; flags e itens de venda agora persistem em SQLite.
+**Status da reauditoria:** concluída. O objetivo técnico foi atingido: `features.json`, o importador legado e a coluna `items_json` foram removidos; flags e itens de venda persistem em SQLite.
+
+## Reauditoria do estado atual
+
+Foi inspecionado o código próprio do cliente e servidor, o schema SQLite, os DAOs, rotas, testes e todos os Markdown da raiz. O resultado atual é:
+
+| Categoria | Estado | Decisão correta |
+| --- | --- | --- |
+| Arquivo JSON de dados/configuração do Praticom | Não existe | Não há arquivo a apagar. |
+| JSON armazenado no SQLite | Não existe | `market_sale_items` substituiu `market_sales.items_json`. |
+| `package.json` e `package-lock.json` | Existem em `client/` e `server/` | Manter: são manifestos e lockfiles obrigatórios do npm. |
+| JSON de HTTP | Usado em Express, React e testes | Manter: é o contrato REST público da aplicação. |
+| Menções em Markdown | Persistem em documentos históricos | Corrigir/arquivar a redação, sem alterar a história técnica dos relatórios. |
+
+### Ação recomendada a partir deste estado
+
+1. Não apagar `package.json` nem `package-lock.json`; sua remoção impede instalação, build e execução reproduzível.
+2. Não substituir JSON no tráfego HTTP sem uma decisão de arquitetura explícita: isso quebraria o frontend, os endpoints e os testes sem benefício de persistência.
+3. Atualizar os trechos correntes de `MIGRACAO_BANCO.md`, `PLANO_ACAO.md`, `PLANO_PREPARACAO_E_TESTES.md`, `PLANO_REFATORACAO.md`, `APRENDIZADO.md` e `RELATORIO_IMPLEMENTACAO.md` que ainda instruem usar `migrate.js`, `features.json`, `condo_store.json` ou `items_json`. Eles devem ser marcados como históricos ou removidos quando afirmarem ser instruções atuais.
+4. Adicionar uma verificação de regressão ao CI/teste: falhar se código próprio introduzir leitura/escrita de `condo_store`, `features.json` ou `items_json`; permitir `package*.json` e serialização HTTP.
+5. Manter backup do SQLite em local seguro antes de alterações estruturais, sem reintroduzir backups JSON de dados operacionais.
+
+**Critério final:** fora de `node_modules`, devem existir somente os quatro manifestos/lockfiles do npm com extensão `.json`; o código pode usar JSON apenas no limite HTTP e nos testes.
 
 ## Objetivo e limite técnico
 

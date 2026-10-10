@@ -9,9 +9,18 @@ async function request(endpoint, options = {}) {
 
   try {
     const res = await fetch(url, { ...options, headers });
-    const data = await res.json();
+    const contentType = res.headers.get('content-type') || '';
+    const data = contentType.includes('application/json')
+      ? await res.json()
+      : await res.text();
     if (!res.ok) {
-      throw new Error(data.error || 'Erro ao processar requisição no servidor.');
+      const detail = typeof data === 'object'
+        ? data.error
+        : `A API respondeu HTTP ${res.status} em formato inválido. Reinicie o backend se ele tiver sido atualizado.`;
+      throw new Error(detail || `A API respondeu com HTTP ${res.status}. Reinicie o backend se ele tiver sido atualizado.`);
+    }
+    if (typeof data === 'string') {
+      throw new Error('A API respondeu HTML/texto em vez de JSON. Reinicie o backend e tente novamente.');
     }
     return data;
   } catch (error) {
@@ -21,6 +30,17 @@ async function request(endpoint, options = {}) {
 }
 
 export const api = {
+  // Condomínios e blocos
+  getCondominiums: (params = {}) => request(`/condominiums${Object.keys(params).length ? '?' + new URLSearchParams(params) : ''}`),
+  createCondominium: (data) => request('/condominiums', { method: 'POST', body: JSON.stringify(data) }),
+  updateCondominium: (id, data) => request(`/condominiums/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updateCondominiumStatus: (id, status) => request(`/condominiums/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  getBlocks: (condominiumId) => request(`/condominiums/${condominiumId}/blocks`),
+  createBlock: (condominiumId, data) => request(`/condominiums/${condominiumId}/blocks`, { method: 'POST', body: JSON.stringify(data) }),
+  updateBlock: (id, data) => request(`/blocks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updateBlockStatus: (id, status) => request(`/blocks/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  getPendingUnits: () => request('/territory/pending-units'),
+  mapLegacyUnits: (blockId, legacy_block) => request(`/blocks/${blockId}/map-legacy-units`, { method: 'PATCH', body: JSON.stringify({ legacy_block }) }),
   // Dashboard
   getDashboard: () => request('/dashboard'),
 

@@ -4,6 +4,7 @@ import { FinancialDAO } from './FinancialDAO.js';
 import { AccessDAO, AnnouncementDAO } from './OperationsDAO.js';
 import { ReservationDAO } from './ReservationDAO.js';
 import { MarketDAO } from './MarketDAO.js';
+import { CondominiumDAO } from './CondominiumDAO.js';
 
 /**
  * Padrão de Projeto: FACTORY METHOD (3/3)
@@ -27,6 +28,9 @@ export class DAOFactory {
         return new MarketDAO();
       case 'announcement':
         return new AnnouncementDAO();
+      case 'condominium':
+      case 'block':
+        return new CondominiumDAO();
       default:
         throw new Error(`Tipo de DAO desconhecido: ${type}`);
     }
