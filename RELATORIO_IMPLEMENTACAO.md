@@ -1,5 +1,7 @@
 # 📝 RELATÓRIO DE IMPLEMENTAÇÃO — PRATICOM ERP
 
+> Nota de histórico: este relatório antecede a normalização de flags e itens de venda no SQLite. Para o estado vigente, consulte `0md.md`.
+
 **Data:** 09/10/2026  
 **Status:** Concluído com Sucesso  
 **Princípio Crítico:** Preservação Integral do Frontend (`client/src/*` 100% inalterado)

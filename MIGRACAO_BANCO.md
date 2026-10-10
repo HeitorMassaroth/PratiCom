@@ -1,5 +1,7 @@
 # 🗄️ GUIA DE MIGRAÇÃO E ESTRUTURA DO BANCO DE DADOS — PRATICOM ERP
 
+> Nota de histórico: este documento descreve a migração original já concluída. O estado vigente não contém importador, arquivo de dados ou configuração própria em JSON; consulte `0md.md`.
+
 **Tecnologia:** SQLite 3 (via `better-sqlite3`)  
 **Arquivo de Banco:** `server/condo_database.sqlite`  
 **Arquivo de Backup:** `server/condo_store.json.bak`

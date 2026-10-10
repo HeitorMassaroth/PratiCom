@@ -136,11 +136,31 @@ export class MarketDAO {
 
       // 2. Insere registro de venda
       const stmt = this.db.prepare(`
-        INSERT INTO market_sales (unit_id, resident_id, total_amount, payment_method, items_json)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO market_sales (unit_id, resident_id, total_amount, payment_method)
+        VALUES (?, ?, ?, ?)
       `);
 
-      const info = stmt.run(unitId, residentId, amount, methodFormatted, JSON.stringify(items || []));
+      const info = stmt.run(unitId, residentId, amount, methodFormatted);
+      const saleId = info.lastInsertRowid;
+      const insertItem = this.db.prepare(`
+        INSERT INTO market_sale_items (sale_id, product_id, product_name, unit_price, quantity, line_total)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const item of items || []) {
+        const productId = parseInt(item.product_id || item.id, 10);
+        const product = this.db.prepare('SELECT name FROM market_products WHERE id = ?').get(productId);
+        const quantity = parseInt(item.quantity || 1, 10);
+        const unitPrice = parseFloat(item.price || item.sale_price || 0);
+        insertItem.run(
+          saleId,
+          productId || null,
+          item.name || product?.name || 'Produto removido',
+          unitPrice,
+          quantity,
+          unitPrice * quantity
+        );
+      }
 
       // 3. Se o pagamento for débito em cota condominial, gera transação financeira em débito
       if (isCondoBill) {
@@ -150,7 +170,7 @@ export class MarketDAO {
         `).run(unitId, amount);
       }
 
-      return this.db.prepare('SELECT * FROM market_sales WHERE id = ?').get(info.lastInsertRowid);
+      return this.db.prepare('SELECT * FROM market_sales WHERE id = ?').get(saleId);
     });
 
     return transaction();
@@ -165,9 +185,12 @@ export class MarketDAO {
       ORDER BY s.created_at DESC
     `;
     const sales = this.db.prepare(sql).all();
-    return sales.map(s => ({
-      ...s,
-      items: JSON.parse(s.items_json || '[]')
-    }));
+    const getItems = this.db.prepare(`
+      SELECT product_id, product_name AS name, unit_price AS price, quantity, line_total
+      FROM market_sale_items
+      WHERE sale_id = ?
+      ORDER BY id ASC
+    `);
+    return sales.map(s => ({ ...s, items: getItems.all(s.id) }));
   }
 }

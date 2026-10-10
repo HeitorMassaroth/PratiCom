@@ -1,5 +1,7 @@
 # 📋 PLANO DE AÇÃO TÉCNICO: TRANSIÇÃO PARA BANCO DE DADOS RELACIONAL E ATENDIMENTO AOS REQUISITOS ACADÊMICOS
 
+> Nota de histórico: este plano descreve a transição original. O estado atual e a eliminação dos usos internos de JSON estão registrados em `0md.md`.
+
 **Projeto:** Praticom - Sistema Integrado de Gestão Condominial (ERP)  
 **Objetivo:** Transformar a arquitetura atual de persistência em arquivo JSON local para um banco de dados relacional robusto, implementando padrões de projeto (GoF), Linha de Produtos de Software (LPS), telas CRUD por integrante, refatoração documentada e plano de testes completo.
 

@@ -5,7 +5,7 @@
 O **Praticom ERP** opera em uma arquitetura desacoplada (Decoupled SPA + REST API):
 * **Frontend:** SPA em **React 18** e **Vite 5**, estilizada com variáveis de Vanilla CSS (`client/src/*`), mantida 100% inalterada.
 * **Backend:** API RESTful em **Node.js + Express 4** (`server/server.js`), integrando o banco de dados relacional **SQLite 3** (`server/condo_database.sqlite`) via o driver nativo `better-sqlite3`.
-* **Persistência Relacional:** O sistema abandonou a leitura e escrita síncrona no arquivo JSON plano (`condo_store.json`), operando via **Data Access Objects (DAOs)** e **Singleton** com suporte a transações ACID e integridade referencial enforçada (`PRAGMA foreign_keys = ON;`).
+* **Persistência Relacional:** O sistema opera exclusivamente via **Data Access Objects (DAOs)** e **Singleton** sobre SQLite, com suporte a transações ACID e integridade referencial enforçada (`PRAGMA foreign_keys = ON;`). Feature flags e itens de venda também são tabelas relacionais.
 
 ---
 
@@ -16,10 +16,10 @@ O **Praticom ERP** opera em uma arquitetura desacoplada (Decoupled SPA + REST AP
 | [`server/schema.sql`](file:///c:/Users/Heitor/Praticom/server/schema.sql) | Definição do schema DDL SQL com 12 tabelas relacional, PKs, FKs, restrições e índices otimizados. | ✅ Implementado |
 | [`server/config/DatabaseSingleton.js`](file:///c:/Users/Heitor/Praticom/server/config/DatabaseSingleton.js) | Instância única Singleton da conexão com o banco relacional SQLite. | ✅ Implementado |
 | [`server/config/AppConfigSingleton.js`](file:///c:/Users/Heitor/Praticom/server/config/AppConfigSingleton.js) | Gerenciador Singleton de Feature Flags e configurações da Linha de Produtos de Software (LPS). | ✅ Implementado |
-| [`server/config/features.json`](file:///c:/Users/Heitor/Praticom/server/config/features.json) | Configuração de ativação/desativação dinâmica dos módulos (`ENABLE_MARKETPLACE`, `ENABLE_ADVANCED_DELIVERIES`). | ✅ Implementado |
+| `app_features` (SQLite) | Configuração de ativação/desativação dinâmica dos módulos (`ENABLE_MARKETPLACE`, `ENABLE_ADVANCED_DELIVERIES`). | ✅ Implementado |
 | [`server/services/templates/*`](file:///c:/Users/Heitor/Praticom/server/services/templates/) | Três implementações do padrão **Template Method** (`ReportTemplate.js`, `PaymentTemplate.js`, `NotificationTemplate.js`). | ✅ Implementado |
 | [`server/dao/*`](file:///c:/Users/Heitor/Praticom/server/dao/) | Sete DAOs relacional (`ResidentDAO`, `DeliveryDAO`, `FinancialDAO`, `AccessDAO`, `ReservationDAO`, `MarketDAO`, `AnnouncementDAO`) e a fábrica `DAOFactory.js` (Padrão Factory Method). | ✅ Implementado |
-| [`server/migrate.js`](file:///c:/Users/Heitor/Praticom/server/migrate.js) | Script de migração transacional ACID dos dados legados em JSON para o banco SQLite. | ✅ Implementado |
+| Migração histórica | A importação do legado já foi concluída; não há importador JSON ativo no repositório. | ✅ Concluído |
 | [`server/server.js`](file:///c:/Users/Heitor/Praticom/server/server.js) | Refatoração dos 14 endpoints da API RESTful para consumir os DAOs relacionais e verificar Feature Flags da LPS, mantendo 100% dos contratos da API. | ✅ Implementado |
 | [`start_app.ps1`](file:///c:/Users/Heitor/Praticom/start_app.ps1) | Torna o script PowerShell portável utilizando `$PSScriptRoot` e comandos globais `node`/`npm`. | ✅ Implementado |
 

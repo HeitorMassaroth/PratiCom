@@ -158,9 +158,28 @@ CREATE TABLE IF NOT EXISTS market_sales (
     total_amount REAL NOT NULL,
     payment_method TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    items_json TEXT NOT NULL,
     FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE,
     FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+);
+
+-- 13. Mercadinho - Itens da Venda
+CREATE TABLE IF NOT EXISTS market_sale_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_id INTEGER NOT NULL,
+    product_id INTEGER,
+    product_name TEXT NOT NULL,
+    unit_price REAL NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    line_total REAL NOT NULL,
+    FOREIGN KEY (sale_id) REFERENCES market_sales(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES market_products(id) ON DELETE SET NULL
+);
+
+-- 14. Configurações persistentes da Linha de Produtos (LPS)
+CREATE TABLE IF NOT EXISTS app_features (
+    feature TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Índices Otimizados
@@ -169,3 +188,4 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_status ON deliveries(status);
 CREATE INDEX IF NOT EXISTS idx_access_status ON access_logs(status);
 CREATE INDEX IF NOT EXISTS idx_reservations_date ON reservations(reservation_date);
 CREATE INDEX IF NOT EXISTS idx_financial_status ON financial_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_market_sale_items_sale ON market_sale_items(sale_id);

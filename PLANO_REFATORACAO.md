@@ -1,5 +1,7 @@
 # 🏗️ AUDITORIA DE ARQUIVOS E PLANO DE REFATORAÇÃO DO PRATICOM ERP
 
+> Nota de histórico: este documento registra a análise anterior. O arquivo de configuração e o importador JSON citados abaixo não fazem parte do estado atual; consulte `0md.md`.
+
 **Projeto:** Praticom ERP (Sistema Integrado de Gestão Condominial)  
 **Status da Auditoria:** Concluída com Sucesso (Somente Análise e Planejamento)  
 **Regra Crítica:** Nenhuma alteração foi realizada no código, frontend ou banco nesta etapa.

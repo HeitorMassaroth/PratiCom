@@ -1,5 +1,7 @@
 # 📊 RELATÓRIO DE TESTES FUNCIONAIS E AUDITORIA COMPLETA — PRATICOM ERP
 
+> Nota de histórico: este relatório descreve a migração original. O estado vigente não possui persistência própria em JSON; consulte `0md.md`.
+
 **Projeto:** Praticom ERP (Sistema Integrado de Gestão Condominial)  
 **Data da Execução:** 10/10/2026  
 **Status da Auditoria:** Concluída com 100% de Aprovação (`APROVADO`)  

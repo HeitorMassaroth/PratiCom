@@ -1,5 +1,7 @@
 # 📋 PLANO DE PREPARAÇÃO, AUDITORIA FUNCIONAL E CENTRALIZAÇÃO DO SQLITE — PRATICOM ERP
 
+> Nota de histórico: este é um plano de execução anterior. O estado atual usa SQLite para flags e itens de venda; consulte `0md.md`.
+
 **Projeto:** Praticom ERP (Sistema Integrado de Gestão Condominial)  
 **Data:** 10/10/2026  
 **Status do Documento:** Planejamento e Preparação para Execução  

@@ -1,10 +1,9 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import DatabaseSingleton from './DatabaseSingleton.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const featuresPath = path.join(__dirname, 'features.json');
+const DEFAULT_FEATURES = {
+  ENABLE_MARKETPLACE: true,
+  ENABLE_ADVANCED_DELIVERIES: true
+};
 
 /**
  * Padrão de Projeto: SINGLETON (2/2)
@@ -16,42 +15,45 @@ class AppConfigSingleton {
       return AppConfigSingleton.instance;
     }
 
-    this.features = {
-      ENABLE_MARKETPLACE: true,
-      ENABLE_ADVANCED_DELIVERIES: true
-    };
-    this.loadFeatures();
+    this.db = DatabaseSingleton.getDb();
+    this.ensureFeatures();
 
     AppConfigSingleton.instance = this;
   }
 
-  loadFeatures() {
-    try {
-      if (fs.existsSync(featuresPath)) {
-        const data = fs.readFileSync(featuresPath, 'utf-8');
-        this.features = JSON.parse(data);
-        console.log('⚙️ Configurações LPS de Feature Flags carregadas:', this.features);
-      }
-    } catch (err) {
-      console.error('Erro ao carregar features.json:', err);
+  ensureFeatures() {
+    const insert = this.db.prepare(`
+      INSERT OR IGNORE INTO app_features (feature, enabled)
+      VALUES (?, ?)
+    `);
+
+    for (const [feature, enabled] of Object.entries(DEFAULT_FEATURES)) {
+      insert.run(feature, enabled ? 1 : 0);
     }
   }
 
   isFeatureEnabled(featureName) {
-    return !!this.features[featureName];
+    const row = this.db.prepare('SELECT enabled FROM app_features WHERE feature = ?').get(featureName);
+    return !!row?.enabled;
   }
 
   getFeatures() {
-    return { ...this.features };
+    return Object.fromEntries(
+      this.db.prepare('SELECT feature, enabled FROM app_features ORDER BY feature').all()
+        .map(({ feature, enabled }) => [feature, Boolean(enabled)])
+    );
   }
 
   updateFeature(featureName, enabled) {
-    this.features[featureName] = enabled;
-    try {
-      fs.writeFileSync(featuresPath, JSON.stringify(this.features, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('Erro ao salvar features.json:', err);
+    if (!Object.hasOwn(DEFAULT_FEATURES, featureName)) {
+      throw new Error(`Feature desconhecida: ${featureName}`);
     }
+
+    this.db.prepare(`
+      UPDATE app_features
+      SET enabled = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE feature = ?
+    `).run(enabled ? 1 : 0, featureName);
   }
 }
 

@@ -1,5 +1,7 @@
 # 🧪 RELATÓRIO DE TESTES E COMPATIBILIDADE — PRATICOM ERP
 
+> Nota de histórico: este relatório registra a validação anterior. A validação posterior à remoção dos usos internos de JSON está registrada em `0md.md`.
+
 **Data:** 09/10/2026  
 **Ambiente de Testes:** Node.js v24.14.0 | SQLite (`better-sqlite3`) | Windows  
 **Status dos Testes:** 100% de Aprovação
