@@ -20,29 +20,36 @@ export class FinancialDAO {
     if (condominiumId) {
       const cId = parseInt(condominiumId, 10);
       if (cId === 1) {
-        whereClause += ' AND (condominium_id = 1 OR condominium_id IS NULL)';
+        whereClause += ' AND (f.condominium_id = 1 OR f.condominium_id IS NULL OR b.condominium_id = 1 OR u.block_id IS NULL)';
         unitWhereClause += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
       } else {
-        whereClause += ' AND condominium_id = ?';
-        params.push(cId);
+        whereClause += ' AND (f.condominium_id = ? OR b.condominium_id = ?)';
+        params.push(cId, cId);
         unitWhereClause += ' AND b.condominium_id = ?';
         unitParams.push(cId);
       }
     }
 
-    const totalBalanceRow = this.db.prepare(`
-      SELECT 
-        SUM(CASE WHEN type = 'INCOME' AND status = 'PAID' THEN amount ELSE 0 END) -
-        SUM(CASE WHEN type = 'EXPENSE' AND status = 'PAID' THEN amount ELSE 0 END) as balance,
-        SUM(CASE WHEN type = 'INCOME' AND status = 'PAID' THEN amount ELSE 0 END) as income,
-        SUM(CASE WHEN type = 'EXPENSE' AND status = 'PAID' THEN amount ELSE 0 END) as expense,
-        SUM(CASE WHEN type = 'INCOME' AND status = 'OVERDUE' THEN amount ELSE 0 END) as default_amount
-      FROM financial_transactions
+    const totals = this.db.prepare(`
+      SELECT
+        SUM(CASE WHEN UPPER(f.type) = 'INCOME' AND UPPER(f.status) = 'PAID' THEN f.amount ELSE 0 END) AS income_paid,
+        SUM(CASE WHEN UPPER(f.type) = 'INCOME' AND UPPER(f.status) IN ('PENDING', 'OVERDUE') THEN f.amount ELSE 0 END) AS income_pending,
+        SUM(CASE WHEN UPPER(f.type) = 'INCOME' AND UPPER(f.status) = 'OVERDUE' THEN f.amount ELSE 0 END) AS income_overdue,
+        SUM(CASE WHEN UPPER(f.type) = 'EXPENSE' AND UPPER(f.status) = 'PAID' THEN f.amount ELSE 0 END) AS expense_paid,
+        SUM(CASE WHEN UPPER(f.type) = 'EXPENSE' AND UPPER(f.status) IN ('PENDING', 'OVERDUE') THEN f.amount ELSE 0 END) AS expense_pending,
+        SUM(CASE WHEN UPPER(f.type) = 'EXPENSE' AND UPPER(f.status) = 'OVERDUE' THEN f.amount ELSE 0 END) AS expense_overdue
+      FROM financial_transactions f
+      LEFT JOIN units u ON f.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
       ${whereClause}
     `).get(...params);
 
     const overdueCount = this.db.prepare(`
-      SELECT COUNT(DISTINCT unit_id) as count FROM financial_transactions ${whereClause} AND status = 'OVERDUE'
+      SELECT COUNT(DISTINCT f.unit_id) AS count
+      FROM financial_transactions f
+      LEFT JOIN units u ON f.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
+      ${whereClause} AND UPPER(f.type) = 'INCOME' AND UPPER(f.status) = 'OVERDUE'
     `).get(...params).count;
 
     const totalUnits = this.db.prepare(`
@@ -50,19 +57,39 @@ export class FinancialDAO {
     `).get(...unitParams).count;
 
     const defaultRate = totalUnits > 0 ? (overdueCount / totalUnits) * 100 : 0;
+    const delinquencyByUnit = this.db.prepare(`
+      SELECT u.block, u.number AS unit_number, SUM(f.amount) AS total_debt
+      FROM financial_transactions f
+      JOIN units u ON f.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
+      ${whereClause} AND UPPER(f.type) = 'INCOME' AND UPPER(f.status) = 'OVERDUE'
+      GROUP BY u.id
+      ORDER BY total_debt DESC
+    `).all(...params);
+    const incomePaid = totals?.income_paid || 0;
+    const expensePaid = totals?.expense_paid || 0;
 
     return {
-      total_balance: totalBalanceRow?.balance || 0,
-      monthly_income: totalBalanceRow?.income || 0,
-      monthly_expenses: totalBalanceRow?.expense || 0,
+      income: {
+        paid: incomePaid,
+        pending: totals?.income_pending || 0,
+        overdue: totals?.income_overdue || 0
+      },
+      expense: {
+        paid: expensePaid,
+        pending: totals?.expense_pending || 0,
+        overdue: totals?.expense_overdue || 0
+      },
+      currentBalance: incomePaid - expensePaid,
       default_rate: parseFloat(defaultRate.toFixed(1)),
-      default_amount: totalBalanceRow?.default_amount || 0
+      delinquencyByUnit
     };
   }
 
-  getTransactions({ condominiumId, status, type, search } = {}) {
+  getTransactions({ condominiumId, status, type, category, search } = {}) {
     let sql = `
-      SELECT f.*, u.block, u.number as unit_number
+      SELECT f.*, f.id AS document_number, f.paid_at AS payment_date,
+        u.block, u.number as unit_number
       FROM financial_transactions f
       LEFT JOIN units u ON f.unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
@@ -81,13 +108,18 @@ export class FinancialDAO {
     }
 
     if (status) {
-      sql += ' AND f.status = ?';
-      params.push(status);
+      sql += ' AND UPPER(f.status) = ?';
+      params.push(status.toUpperCase());
     }
 
     if (type) {
-      sql += ' AND f.type = ?';
-      params.push(type);
+      sql += ' AND UPPER(f.type) = ?';
+      params.push(type.toUpperCase());
+    }
+
+    if (category) {
+      sql += ' AND f.category = ?';
+      params.push(category);
     }
 
     if (search) {
@@ -110,23 +142,53 @@ export class FinancialDAO {
       data.unit_id ? parseInt(data.unit_id, 10) : null,
       data.description,
       parseFloat(data.amount),
-      data.type,
+      data.type.toUpperCase(),
       data.category || 'Outros',
-      data.status || 'PENDING',
+      (data.status || 'PENDING').toUpperCase(),
       data.due_date || new Date().toISOString().split('T')[0]
     );
 
-    return this.db.prepare('SELECT * FROM financial_transactions WHERE id = ?').get(info.lastInsertRowid);
+    return this.db.prepare(`
+      SELECT f.*, f.id AS document_number, f.paid_at AS payment_date,
+        u.block, u.number AS unit_number
+      FROM financial_transactions f
+      LEFT JOIN units u ON f.unit_id = u.id
+      WHERE f.id = ?
+    `).get(info.lastInsertRowid);
   }
 
-  payTransaction(id) {
+  payTransaction(id, condominiumId) {
+    let scope = '';
+    const params = [parseInt(id, 10)];
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        scope = ' AND (scoped.condominium_id = 1 OR scoped.condominium_id IS NULL OR b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        scope = ' AND (scoped.condominium_id = ? OR b.condominium_id = ?)';
+        params.push(cId, cId);
+      }
+    }
     const stmt = this.db.prepare(`
-      UPDATE financial_transactions
+      UPDATE financial_transactions AS f
       SET status = 'PAID', paid_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE f.id = ?
+        AND EXISTS (
+          SELECT 1 FROM financial_transactions scoped
+          LEFT JOIN units u ON scoped.unit_id = u.id
+          LEFT JOIN blocks b ON u.block_id = b.id
+          WHERE scoped.id = f.id${scope}
+        )
     `);
-    stmt.run(parseInt(id, 10));
-    return this.db.prepare('SELECT * FROM financial_transactions WHERE id = ?').get(parseInt(id, 10));
+    const result = stmt.run(...params);
+    if (result.changes === 0) return null;
+    return this.db.prepare(`
+      SELECT f.*, f.id AS document_number, f.paid_at AS payment_date,
+        u.block, u.number AS unit_number
+      FROM financial_transactions f
+      LEFT JOIN units u ON f.unit_id = u.id
+      WHERE f.id = ?
+    `).get(parseInt(id, 10));
   }
 
   generateReport() {

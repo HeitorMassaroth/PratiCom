@@ -360,8 +360,8 @@ app.patch('/api/reservations/:id/cancel', (req, res) => {
 // ==========================================
 app.get('/api/financial/transactions', (req, res) => {
   try {
-    const { status, type, search } = req.query;
-    const txs = financialDAO.getTransactions({ condominiumId: req.condominiumId, status, type, search });
+    const { status, type, category, search } = req.query;
+    const txs = financialDAO.getTransactions({ condominiumId: req.condominiumId, status, type, category, search });
     res.json(txs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -393,7 +393,10 @@ app.post('/api/financial/transactions', (req, res) => {
 app.patch('/api/financial/transactions/:id/pay', (req, res) => {
   try {
     const { id } = req.params;
-    const updated = financialDAO.payTransaction(id);
+    const updated = financialDAO.payTransaction(id, req.condominiumId);
+    if (!updated) {
+      return res.status(404).json({ error: 'Lançamento financeiro não encontrado.' });
+    }
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -283,22 +283,22 @@ export default function FinancialView({ showToast }) {
                       <div style={{ 
                         fontWeight: '800', 
                         fontSize: '0.95rem',
-                        color: tx.type === 'income' ? '#10b981' : '#ef4444',
+                        color: tx.type?.toUpperCase() === 'INCOME' ? '#10b981' : '#ef4444',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px'
                       }}>
-                        {tx.type === 'income' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                        {tx.type?.toUpperCase() === 'INCOME' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
                         R$ {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </div>
                     </td>
                     <td>
-                      {tx.status === 'paid' && <span className="badge badge-success"><CheckCircle2 size={12} /> Pago</span>}
-                      {tx.status === 'pending' && <span className="badge badge-warning"><Clock size={12} /> Pendente</span>}
-                      {tx.status === 'overdue' && <span className="badge badge-danger"><AlertCircle size={12} /> Vencido</span>}
+                      {tx.status?.toUpperCase() === 'PAID' && <span className="badge badge-success"><CheckCircle2 size={12} /> Pago</span>}
+                      {tx.status?.toUpperCase() === 'PENDING' && <span className="badge badge-warning"><Clock size={12} /> Pendente</span>}
+                      {tx.status?.toUpperCase() === 'OVERDUE' && <span className="badge badge-danger"><AlertCircle size={12} /> Vencido</span>}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      {tx.status !== 'paid' ? (
+                      {tx.status?.toUpperCase() !== 'PAID' ? (
                         <button 
                           className="btn btn-success btn-sm"
                           onClick={() => handlePay(tx.id)}
