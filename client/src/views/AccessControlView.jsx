@@ -169,7 +169,7 @@ export default function AccessControlView({ showToast }) {
             <Search size={16} />
             <input
               type="text"
-              placeholder="Buscar por nome, documento, placa, empresa..."
+              placeholder="Buscar por nome, documento, placa ou empresa..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -371,9 +371,10 @@ export default function AccessControlView({ showToast }) {
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Unidade de Destino</label>
+                    <label>Unidade de Destino *</label>
                     <select
                       className="form-control"
+                      required
                       value={formData.unit_id}
                       onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
                     >

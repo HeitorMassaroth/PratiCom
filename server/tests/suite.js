@@ -77,14 +77,42 @@ async function runTestSuite() {
     const entryRes = await fetch(`${apiBase}/api/access/entry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ visitor_name: 'Visitante Teste Refatoração', document: '99.888.777-6', destination_unit_id: 1, type: 'Visitante' })
+      body: JSON.stringify({
+        visitor_name: 'Visitante Teste Refatoração',
+        document: '99.888.777-6',
+        destination_unit_id: 1,
+        type: 'Visitante',
+        company: 'Empresa Teste',
+        vehicle_plate: 'TESTE123',
+        authorized_by: 'Morador Teste'
+      })
     });
     const entryData = await entryRes.json();
     console.log(`✅ [201 Created] Portaria Entrada registrada no SQLite -> ID: ${entryData.id}, Status: ${entryData.status}`);
+    const entryFieldsSaved = entryData.company === 'Empresa Teste'
+      && entryData.vehicle_plate === 'TESTE123'
+      && entryData.authorized_by === 'Morador Teste'
+      && Boolean(entryData.entered_at);
+    if (!entryRes.ok || !entryFieldsSaved) {
+      throw new Error('A entrada não retornou os campos extras e o horário esperado.');
+    }
 
     const exitRes = await fetch(`${apiBase}/api/access/${entryData.id}/exit`, { method: 'PATCH' });
     const exitData = await exitRes.json();
     console.log(`✅ [200 OK] Portaria Saída atualizada no SQLite -> ID: ${exitData.id}, Novo Status: ${exitData.status}`);
+    if (!exitRes.ok || !exitData.exited_at) {
+      throw new Error('A saída não retornou o horário no nome esperado pela tela.');
+    }
+
+    const searchRes = await fetch(`${apiBase}/api/access?search=TESTE123`);
+    const searchData = await searchRes.json();
+    if (searchRes.ok && searchData.some(log => log.id === entryData.id)) {
+      console.log('✅ Busca por placa encontrou o registro de acesso.');
+      successCount++;
+    } else {
+      console.error('❌ A busca por placa não encontrou o registro de acesso.');
+      failCount++;
+    }
 
     const deleteRes = await fetch(`${apiBase}/api/access/${entryData.id}`, { method: 'DELETE' });
     const deleteData = await deleteRes.json();

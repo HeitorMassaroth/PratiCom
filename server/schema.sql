@@ -109,6 +109,9 @@ CREATE TABLE IF NOT EXISTS access_logs (
     entry_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     exit_time DATETIME,
     status TEXT DEFAULT 'IN_PROPERTY',
+    company TEXT,
+    vehicle_plate TEXT,
+    authorized_by TEXT,
     notes TEXT,
     FOREIGN KEY (destination_unit_id) REFERENCES units(id) ON DELETE CASCADE
 );

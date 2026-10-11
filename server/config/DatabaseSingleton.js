@@ -23,7 +23,7 @@ class DatabaseSingleton {
     this.db.pragma('foreign_keys = ON');
 
     // Compatibiliza bancos existentes antes de criar índices do schema novo.
-    this.applyTerritorialCompatibilityMigration();
+    this.applyCompatibilityMigrations();
 
     // Executa schema DDL se o banco foi criado
     if (fs.existsSync(schemaPath)) {
@@ -38,7 +38,7 @@ class DatabaseSingleton {
     return this.db;
   }
 
-  applyTerritorialCompatibilityMigration() {
+  applyCompatibilityMigrations() {
     const addColumnIfMissing = (table, definition) => {
       const column = definition.split(/\s+/)[0];
       const tableExists = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
@@ -54,6 +54,9 @@ class DatabaseSingleton {
     addColumnIfMissing('announcements', 'condominium_id INTEGER');
     addColumnIfMissing('announcements', 'block_id INTEGER');
     addColumnIfMissing('market_products', 'condominium_id INTEGER');
+    addColumnIfMissing('access_logs', 'company TEXT');
+    addColumnIfMissing('access_logs', 'vehicle_plate TEXT');
+    addColumnIfMissing('access_logs', 'authorized_by TEXT');
   }
 }
 

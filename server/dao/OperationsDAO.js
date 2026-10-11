@@ -42,9 +42,14 @@ export class AccessDAO {
     }
 
     if (search) {
-      sql += ' AND (LOWER(a.visitor_name) LIKE ? OR a.document LIKE ?)';
+      sql += ` AND (
+        LOWER(a.visitor_name) LIKE ?
+        OR a.document LIKE ?
+        OR LOWER(COALESCE(a.company, '')) LIKE ?
+        OR UPPER(COALESCE(a.vehicle_plate, '')) LIKE ?
+      )`;
       const term = `%${search.toLowerCase()}%`;
-      params.push(term, term);
+      params.push(term, term, term, `%${search.toUpperCase()}%`);
     }
 
     sql += ' ORDER BY a.entry_time DESC';
@@ -53,8 +58,11 @@ export class AccessDAO {
 
   registerEntry(data) {
     const stmt = this.db.prepare(`
-      INSERT INTO access_logs (visitor_name, document, type, destination_unit_id, status, notes, entry_time)
-      VALUES (?, ?, ?, ?, 'IN_PROPERTY', ?, CURRENT_TIMESTAMP)
+      INSERT INTO access_logs (
+        visitor_name, document, type, destination_unit_id, status,
+        company, vehicle_plate, authorized_by, notes, entry_time
+      )
+      VALUES (?, ?, ?, ?, 'IN_PROPERTY', ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `);
 
     const info = stmt.run(
@@ -62,12 +70,19 @@ export class AccessDAO {
       data.document,
       data.type || 'Visitante',
       parseInt(data.destination_unit_id || data.unit_id, 10),
+      data.company || null,
+      data.vehicle_plate || null,
+      data.authorized_by || null,
       data.notes || ''
     );
 
-    const log = this.db.prepare('SELECT * FROM access_logs WHERE id = ?').get(info.lastInsertRowid);
-    const unit = this.db.prepare('SELECT block, number FROM units WHERE id = ?').get(log.destination_unit_id) || {};
-    return { ...log, block: unit.block || '', unit_number: unit.number || '' };
+    return this.db.prepare(`
+      SELECT a.*, a.entry_time AS entered_at, a.exit_time AS exited_at,
+        u.block, u.number AS unit_number
+      FROM access_logs a
+      LEFT JOIN units u ON a.destination_unit_id = u.id
+      WHERE a.id = ?
+    `).get(info.lastInsertRowid);
   }
 
   registerExit(id) {
@@ -77,7 +92,13 @@ export class AccessDAO {
       WHERE id = ?
     `);
     stmt.run(parseInt(id, 10));
-    return this.db.prepare('SELECT * FROM access_logs WHERE id = ?').get(parseInt(id, 10));
+    return this.db.prepare(`
+      SELECT a.*, a.entry_time AS entered_at, a.exit_time AS exited_at,
+        u.block, u.number AS unit_number
+      FROM access_logs a
+      LEFT JOIN units u ON a.destination_unit_id = u.id
+      WHERE a.id = ?
+    `).get(parseInt(id, 10));
   }
 
   deleteAccess(id, condominiumId) {
