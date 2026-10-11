@@ -11,7 +11,8 @@ import {
   CheckCircle,
   Building,
   Briefcase,
-  Truck
+  Truck,
+  Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -97,6 +98,17 @@ export default function AccessControlView({ showToast }) {
       loadData();
     } catch (err) {
       showToast(err.message || 'Erro ao registrar saída.', 'danger');
+    }
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`Deseja excluir o registro de acesso de ${name}?`)) return;
+    try {
+      await api.deleteAccess(id);
+      showToast('Registro de acesso excluído.', 'info');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao excluir registro de acesso.', 'danger');
     }
   };
 
@@ -246,16 +258,27 @@ export default function AccessControlView({ showToast }) {
                       )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      {log.status === 'IN_PROPERTY' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                        {log.status === 'IN_PROPERTY' ? (
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleExit(log.id, log.visitor_name)}
+                          >
+                            <LogOut size={14} /> Registrar Saída
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Finalizado</span>
+                        )}
                         <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleExit(log.id, log.visitor_name)}
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          title="Excluir registro de acesso"
+                          aria-label={`Excluir acesso de ${log.visitor_name}`}
+                          onClick={() => handleDelete(log.id, log.visitor_name)}
                         >
-                          <LogOut size={14} /> Registrar Saída
+                          <Trash2 size={14} />
                         </button>
-                      ) : (
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Finalizado</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))

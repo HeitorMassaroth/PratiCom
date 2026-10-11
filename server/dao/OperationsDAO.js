@@ -79,6 +79,30 @@ export class AccessDAO {
     stmt.run(parseInt(id, 10));
     return this.db.prepare('SELECT * FROM access_logs WHERE id = ?').get(parseInt(id, 10));
   }
+
+  deleteAccess(id, condominiumId) {
+    let sql = `
+      DELETE FROM access_logs
+      WHERE id = ?
+        AND destination_unit_id IN (
+          SELECT u.id
+          FROM units u
+          LEFT JOIN blocks b ON u.block_id = b.id
+          WHERE 1=1
+    `;
+    const params = [parseInt(id, 10)];
+    const cId = parseInt(condominiumId, 10);
+
+    if (cId === 1) {
+      sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+    } else {
+      sql += ' AND b.condominium_id = ?';
+      params.push(cId);
+    }
+
+    sql += ')';
+    return this.db.prepare(sql).run(...params).changes > 0;
+  }
 }
 
 export class AnnouncementDAO {

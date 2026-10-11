@@ -85,7 +85,23 @@ async function runTestSuite() {
     const exitRes = await fetch(`${apiBase}/api/access/${entryData.id}/exit`, { method: 'PATCH' });
     const exitData = await exitRes.json();
     console.log(`✅ [200 OK] Portaria Saída atualizada no SQLite -> ID: ${exitData.id}, Novo Status: ${exitData.status}`);
-    successCount += 2;
+
+    const deleteRes = await fetch(`${apiBase}/api/access/${entryData.id}`, { method: 'DELETE' });
+    const deleteData = await deleteRes.json();
+    if (deleteRes.ok) {
+      console.log(`✅ [200 OK] Registro de acesso removido do SQLite -> ${deleteData.message}`);
+      const accessLogs = await fetch(`${apiBase}/api/access`).then(res => res.json());
+      if (!accessLogs.some(log => log.id === entryData.id)) {
+        console.log('✅ Registro excluído não aparece mais na listagem de acessos.');
+        successCount += 4;
+      } else {
+        console.error('❌ O registro excluído ainda aparece na listagem de acessos.');
+        failCount++;
+      }
+    } else {
+      console.error(`❌ [${deleteRes.status}] Erro ao remover registro de acesso: ${deleteData.error}`);
+      failCount++;
+    }
   } catch (err) {
     console.error('❌ Erro no CRUD de Portaria:', err.message);
     failCount++;

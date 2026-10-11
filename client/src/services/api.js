@@ -73,6 +73,7 @@ export const api = {
   },
   registerEntry: (data) => request('/access/entry', { method: 'POST', body: JSON.stringify(data) }),
   registerExit: (id) => request(`/access/${id}/exit`, { method: 'PATCH' }),
+  deleteAccess: (id) => request(`/access/${id}`, { method: 'DELETE' }),
 
   // Unidades & Moradores
   getUnits: () => request('/units'),
@@ -135,4 +136,3 @@ export const api = {
   setActiveCondominiumId,
   getActiveCondominiumId
 };
-

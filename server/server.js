@@ -163,6 +163,19 @@ app.patch('/api/access/:id/exit', (req, res) => {
   }
 });
 
+app.delete('/api/access/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = accessDAO.deleteAccess(id, req.condominiumId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Registro de acesso não encontrado.' });
+    }
+    res.json({ message: 'Registro de acesso excluído com sucesso.' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // ==========================================
 // 4. CADASTRO DE PESSOAS, UNIDADES & VEÍCULOS
 // ==========================================
