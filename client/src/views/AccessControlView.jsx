@@ -16,6 +16,20 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 
+const formatAccessDate = (value, options) => {
+  if (!value) return '—';
+  const date = new Date(typeof value === 'string' ? value.replace(' ', 'T') : value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('pt-BR', options);
+};
+
+const formatAccessTime = (value) => {
+  if (!value) return '';
+  const date = new Date(typeof value === 'string' ? value.replace(' ', 'T') : value);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+};
+
 export default function AccessControlView({ showToast }) {
   const [logs, setLogs] = useState([]);
   const [units, setUnits] = useState([]);
@@ -241,9 +255,9 @@ export default function AccessControlView({ showToast }) {
                       <div style={{ fontSize: '0.85rem' }}>{log.authorized_by || 'Portaria'}</div>
                     </td>
                     <td>
-                      <div style={{ fontSize: '0.85rem' }}>{new Date(log.entered_at).toLocaleDateString('pt-BR')}</div>
+                      <div style={{ fontSize: '0.85rem' }}>{formatAccessDate(log.entered_at)}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                        {new Date(log.entered_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {formatAccessTime(log.entered_at) || '—'}
                       </div>
                     </td>
                     <td>
@@ -253,7 +267,7 @@ export default function AccessControlView({ showToast }) {
                         </span>
                       ) : (
                         <span className="badge badge-success">
-                          <CheckCircle size={12} /> Saiu às {log.exited_at ? new Date(log.exited_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                          <CheckCircle size={12} /> {formatAccessTime(log.exited_at) ? `Saiu às ${formatAccessTime(log.exited_at)}` : 'Saiu'}
                         </span>
                       )}
                     </td>

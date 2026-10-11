@@ -13,7 +13,7 @@ export class AccessDAO {
 
   getAccessLogs({ condominiumId, status, type, search } = {}) {
     let sql = `
-      SELECT a.*, u.block, u.number as unit_number
+      SELECT a.*, a.entry_time AS entered_at, a.exit_time AS exited_at, u.block, u.number as unit_number
       FROM access_logs a
       LEFT JOIN units u ON a.destination_unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
