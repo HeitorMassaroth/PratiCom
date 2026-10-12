@@ -12,8 +12,10 @@ import {
   Bell
 } from 'lucide-react';
 
-export default function Sidebar({ currentView, setCurrentView, stats }) {
-  const menuItems = [
+export default function Sidebar({ currentView, setCurrentView, stats, availableModules = null }) {
+  const mandatoryItems = ['residents', 'territory', 'announcements'];
+
+  const allMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'deliveries', label: 'Controle de Encomendas', icon: Package, badge: stats?.pendingDeliveries, badgeAlert: stats?.pendingDeliveries > 0 },
     { id: 'financial', label: 'Financeiro & Taxas', icon: DollarSign, badge: stats?.overdueCount ? `${stats.overdueCount} pendentes` : null, badgeAlert: stats?.overdueCount > 0 },
@@ -24,6 +26,14 @@ export default function Sidebar({ currentView, setCurrentView, stats }) {
     { id: 'announcements', label: 'Mural de Avisos', icon: Megaphone },
     { id: 'market', label: 'Mercadinho & Estoque', icon: ShoppingCart, badge: stats?.lowStockItems ? `${stats.lowStockItems} repor` : null, badgeAlert: stats?.lowStockItems > 0 },
   ];
+
+  const menuItems = allMenuItems.filter(item => {
+    // Áreas estruturais obrigatórias permanecem SEMPRE disponíveis
+    if (mandatoryItems.includes(item.id)) return true;
+    // Se a lista de módulos ainda não foi carregada, exibe por fallback
+    if (!availableModules) return true;
+    return availableModules.includes(item.id);
+  });
 
   return (
     <aside className="sidebar">

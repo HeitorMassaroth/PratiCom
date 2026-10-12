@@ -3,6 +3,7 @@ import cors from 'cors';
 import { DAOFactory } from './dao/DAOFactory.js';
 import AppConfigSingleton from './config/AppConfigSingleton.js';
 import { tenantContextMiddleware } from './middleware/tenantContext.js';
+import { checkModuleAvailability } from './middleware/moduleGuard.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -42,6 +43,34 @@ app.delete('/api/blocks/:id', (req, res) => { try { condominiumDAO.deleteBlock(r
 app.get('/api/territory/pending-units', (req, res) => { try { res.json(condominiumDAO.getPendingUnits()); } catch (err) { territoryError(res, err); } });
 app.patch('/api/blocks/:id/map-legacy-units', (req, res) => { try { res.json(condominiumDAO.mapPendingUnits(req.params.id, req.body.legacy_block)); } catch (err) { territoryError(res, err); } });
 
+// ==========================================
+// GESTÃO DE MÓDULOS POR CONDOMÍNIO
+// ==========================================
+app.get('/api/condominiums/active/modules', (req, res) => {
+  try {
+    res.json(condominiumDAO.getModules(req.condominiumId));
+  } catch (err) {
+    territoryError(res, err);
+  }
+});
+
+app.get('/api/condominiums/:id/modules', (req, res) => {
+  try {
+    res.json(condominiumDAO.getModules(req.params.id));
+  } catch (err) {
+    territoryError(res, err);
+  }
+});
+
+app.put('/api/condominiums/:id/modules', (req, res) => {
+  try {
+    const updated = condominiumDAO.setModules(req.params.id, req.body.modules || req.body);
+    res.json(updated);
+  } catch (err) {
+    territoryError(res, err);
+  }
+});
+
 // Middleware para Feature Flags (LPS)
 const checkFeature = (featureName) => (req, res, next) => {
   if (!AppConfigSingleton.isFeatureEnabled(featureName)) {
@@ -53,24 +82,34 @@ const checkFeature = (featureName) => (req, res, next) => {
 // ==========================================
 // 1. DASHBOARD & MÉTRICAS CONSOLIDADAS
 // ==========================================
-app.get('/api/dashboard', async (req, res) => {
+app.get('/api/dashboard', checkModuleAvailability('dashboard'), async (req, res) => {
   try {
     const condominiumId = req.condominiumId;
-    const deliveries = deliveryDAO.getDeliveries({ condominiumId });
+
+    const hasDeliveries = condominiumDAO.isModuleEnabled(condominiumId, 'deliveries');
+    const hasAccess = condominiumDAO.isModuleEnabled(condominiumId, 'access');
+    const hasFinancial = condominiumDAO.isModuleEnabled(condominiumId, 'financial');
+    const hasReservations = condominiumDAO.isModuleEnabled(condominiumId, 'reservations');
+
+    const deliveries = hasDeliveries ? deliveryDAO.getDeliveries({ condominiumId }) : [];
     const pendingDeliveries = deliveries.filter(d => d.status === 'pending' || d.status === 'PENDING');
-    const accessLogs = accessDAO.getAccessLogs({ condominiumId });
+
+    const accessLogs = hasAccess ? accessDAO.getAccessLogs({ condominiumId }) : [];
     const activeAccess = accessLogs.filter(a => a.status === 'IN_PROPERTY' || a.status === 'inside');
-    const summary = financialDAO.getSummary({ condominiumId });
+
+    const summary = hasFinancial ? financialDAO.getSummary({ condominiumId }) : { default_amount: 0, default_rate: 0 };
+
     const announcements = announcementDAO.getAnnouncements({ condominiumId });
     const urgentAnnouncements = announcements.filter(a => a.priority === 'URGENTE' || a.priority === 'high');
-    const reservations = spaceDAO.getReservations({ condominiumId });
+
+    const reservations = hasReservations ? spaceDAO.getReservations({ condominiumId }) : [];
 
     const data = {
       metrics: {
-        pendingDeliveries: pendingDeliveries.length,
-        activeAccess: activeAccess.length,
-        overdueAmount: summary.default_amount || 0,
-        defaultRate: summary.default_rate || 0
+        pendingDeliveries: hasDeliveries ? pendingDeliveries.length : null,
+        activeAccess: hasAccess ? activeAccess.length : null,
+        overdueAmount: hasFinancial ? (summary.default_amount || 0) : null,
+        defaultRate: hasFinancial ? (summary.default_rate || 0) : null
       },
       recentAccess: activeAccess.slice(0, 5),
       recentDeliveries: pendingDeliveries.slice(0, 5),
@@ -88,7 +127,7 @@ app.get('/api/dashboard', async (req, res) => {
 // ==========================================
 // 2. ENCOMENDAS (DELIVERIES)
 // ==========================================
-app.get('/api/deliveries', (req, res) => {
+app.get('/api/deliveries', checkModuleAvailability('deliveries'), (req, res) => {
   try {
     const { status, unit_id } = req.query;
     const deliveries = deliveryDAO.getDeliveries({ condominiumId: req.condominiumId, status, unit_id });
@@ -98,7 +137,7 @@ app.get('/api/deliveries', (req, res) => {
   }
 });
 
-app.post('/api/deliveries', (req, res) => {
+app.post('/api/deliveries', checkModuleAvailability('deliveries'), (req, res) => {
   try {
     const { unit_id, courier } = req.body;
     if (!unit_id || !courier) {
@@ -111,7 +150,7 @@ app.post('/api/deliveries', (req, res) => {
   }
 });
 
-app.patch('/api/deliveries/:id/pickup', (req, res) => {
+app.patch('/api/deliveries/:id/pickup', checkModuleAvailability('deliveries'), (req, res) => {
   try {
     const { id } = req.params;
     const { pickup_code, picked_up_by } = req.body;
@@ -130,7 +169,7 @@ app.patch('/api/deliveries/:id/pickup', (req, res) => {
 // ==========================================
 // 3. ENTRADA E SAÍDA DE PESSOAS (PORTARIA)
 // ==========================================
-app.get('/api/access', (req, res) => {
+app.get('/api/access', checkModuleAvailability('access'), (req, res) => {
   try {
     const { status, type, search } = req.query;
     const logs = accessDAO.getAccessLogs({ condominiumId: req.condominiumId, status, type, search });
@@ -140,7 +179,7 @@ app.get('/api/access', (req, res) => {
   }
 });
 
-app.post('/api/access/entry', (req, res) => {
+app.post('/api/access/entry', checkModuleAvailability('access'), (req, res) => {
   try {
     const { visitor_name, document } = req.body;
     if (!visitor_name || !document) {
@@ -153,7 +192,7 @@ app.post('/api/access/entry', (req, res) => {
   }
 });
 
-app.patch('/api/access/:id/exit', (req, res) => {
+app.patch('/api/access/:id/exit', checkModuleAvailability('access'), (req, res) => {
   try {
     const { id } = req.params;
     const updated = accessDAO.registerExit(id);
@@ -163,7 +202,7 @@ app.patch('/api/access/:id/exit', (req, res) => {
   }
 });
 
-app.delete('/api/access/:id', (req, res) => {
+app.delete('/api/access/:id', checkModuleAvailability('access'), (req, res) => {
   try {
     const { id } = req.params;
     const deleted = accessDAO.deleteAccess(id, req.condominiumId);
@@ -311,9 +350,10 @@ app.get('/api/pets', (req, res) => {
 });
 
 // ==========================================
+// ==========================================
 // 5. RESERVAS DE ESPAÇOS COMUNS
 // ==========================================
-app.get('/api/spaces', (req, res) => {
+app.get('/api/spaces', checkModuleAvailability('reservations'), (req, res) => {
   try {
     const spaces = spaceDAO.getSpaces({ condominiumId: req.condominiumId });
     res.json(spaces);
@@ -322,7 +362,7 @@ app.get('/api/spaces', (req, res) => {
   }
 });
 
-app.get('/api/reservations', (req, res) => {
+app.get('/api/reservations', checkModuleAvailability('reservations'), (req, res) => {
   try {
     const { space_id, date } = req.query;
     const reservations = spaceDAO.getReservations({ condominiumId: req.condominiumId, space_id, date });
@@ -332,7 +372,7 @@ app.get('/api/reservations', (req, res) => {
   }
 });
 
-app.post('/api/reservations', (req, res) => {
+app.post('/api/reservations', checkModuleAvailability('reservations'), (req, res) => {
   try {
     const { space_id, resident_id, unit_id, reservation_date, start_time, end_time } = req.body;
     if (!space_id || !resident_id || !unit_id || !reservation_date || !start_time || !end_time) {
@@ -345,7 +385,7 @@ app.post('/api/reservations', (req, res) => {
   }
 });
 
-app.patch('/api/reservations/:id/cancel', (req, res) => {
+app.patch('/api/reservations/:id/cancel', checkModuleAvailability('reservations'), (req, res) => {
   try {
     const { id } = req.params;
     spaceDAO.cancelReservation(id);
@@ -358,7 +398,7 @@ app.patch('/api/reservations/:id/cancel', (req, res) => {
 // ==========================================
 // 6. FINANCEIRO CONDOMINIAL
 // ==========================================
-app.get('/api/financial/transactions', (req, res) => {
+app.get('/api/financial/transactions', checkModuleAvailability('financial'), (req, res) => {
   try {
     const { status, type, category, search } = req.query;
     const txs = financialDAO.getTransactions({ condominiumId: req.condominiumId, status, type, category, search });
@@ -368,7 +408,7 @@ app.get('/api/financial/transactions', (req, res) => {
   }
 });
 
-app.get('/api/financial/summary', (req, res) => {
+app.get('/api/financial/summary', checkModuleAvailability('financial'), (req, res) => {
   try {
     const summary = financialDAO.getSummary({ condominiumId: req.condominiumId });
     res.json(summary);
@@ -377,7 +417,7 @@ app.get('/api/financial/summary', (req, res) => {
   }
 });
 
-app.post('/api/financial/transactions', (req, res) => {
+app.post('/api/financial/transactions', checkModuleAvailability('financial'), (req, res) => {
   try {
     const { type, category, description, amount, due_date } = req.body;
     if (!type || !category || !description || !amount || !due_date) {
@@ -390,7 +430,7 @@ app.post('/api/financial/transactions', (req, res) => {
   }
 });
 
-app.patch('/api/financial/transactions/:id/pay', (req, res) => {
+app.patch('/api/financial/transactions/:id/pay', checkModuleAvailability('financial'), (req, res) => {
   try {
     const { id } = req.params;
     const updated = financialDAO.payTransaction(id, req.condominiumId);
@@ -404,7 +444,7 @@ app.patch('/api/financial/transactions/:id/pay', (req, res) => {
 });
 
 // Endpoint extra para relatório via Template Method
-app.get('/api/financial/report', (req, res) => {
+app.get('/api/financial/report', checkModuleAvailability('financial'), (req, res) => {
   try {
     const report = financialDAO.generateReport();
     res.json(report);
@@ -452,7 +492,7 @@ app.delete('/api/announcements/:id', (req, res) => {
 // ==========================================
 // 8. MERCADINHO AUTÔNOMO (LPS: ENABLE_MARKETPLACE)
 // ==========================================
-app.get('/api/market/products', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
+app.get('/api/market/products', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
     const { category, search } = req.query;
     const products = marketDAO.getProducts({ condominiumId: req.condominiumId, category, search });
@@ -462,7 +502,7 @@ app.get('/api/market/products', checkFeature('ENABLE_MARKETPLACE'), (req, res) =
   }
 });
 
-app.post('/api/market/products', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
+app.post('/api/market/products', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
     const { name, price } = req.body;
     if (!name || (!price && price !== 0)) {
@@ -475,7 +515,7 @@ app.post('/api/market/products', checkFeature('ENABLE_MARKETPLACE'), (req, res) 
   }
 });
 
-app.patch('/api/market/products/:id/stock', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
+app.patch('/api/market/products/:id/stock', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
     const { id } = req.params;
     const { quantity, action } = req.body;
@@ -486,7 +526,7 @@ app.patch('/api/market/products/:id/stock', checkFeature('ENABLE_MARKETPLACE'), 
   }
 });
 
-app.post('/api/market/checkout', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
+app.post('/api/market/checkout', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
     const { items, payment_method, unit_id, resident_id, total_amount } = req.body;
     if (!items || items.length === 0) {
@@ -499,7 +539,7 @@ app.post('/api/market/checkout', checkFeature('ENABLE_MARKETPLACE'), (req, res) 
   }
 });
 
-app.get('/api/market/sales', checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
+app.get('/api/market/sales', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
     const sales = marketDAO.getSales({ condominiumId: req.condominiumId });
     res.json(sales);

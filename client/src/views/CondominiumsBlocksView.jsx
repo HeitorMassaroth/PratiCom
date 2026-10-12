@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Building2, Plus, MapPin, Layers, Link2, Edit3, Trash2, Eye, X, Check, Search, 
-  AlertTriangle, Power, Phone, FileText, CheckCircle2, RefreshCw 
+  AlertTriangle, Power, Phone, FileText, CheckCircle2, RefreshCw,
+  Sliders, LayoutDashboard, ShieldCheck, Package, CalendarDays, DollarSign, ShoppingCart, Users, Megaphone
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -37,6 +38,18 @@ export default function CondominiumsBlocksView({ showToast }) {
   const [legacyBlock, setLegacyBlock] = useState('');
   const [targetBlock, setTargetBlock] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Estados dos Módulos Ativáveis por Condomínio
+  const [condoModules, setCondoModules] = useState({
+    dashboard: true,
+    access: true,
+    deliveries: true,
+    reservations: true,
+    financial: true,
+    market: true
+  });
+  const [loadingModules, setLoadingModules] = useState(false);
+  const [savingModules, setSavingModules] = useState(false);
 
   // Carregar dados
   const load = async () => {
@@ -74,9 +87,54 @@ export default function CondominiumsBlocksView({ showToast }) {
 
   useEffect(() => { load(); }, []);
 
+  const loadModulesForSelected = async (condoId) => {
+    if (!condoId) return;
+    setLoadingModules(true);
+    try {
+      const list = await api.getCondominiumModules(condoId);
+      if (Array.isArray(list)) {
+        const map = Object.fromEntries(list.map(m => [m.module_key, Boolean(m.enabled)]));
+        setCondoModules({
+          dashboard: Boolean(map.dashboard),
+          access: Boolean(map.access),
+          deliveries: Boolean(map.deliveries),
+          reservations: Boolean(map.reservations),
+          financial: Boolean(map.financial),
+          market: Boolean(map.market)
+        });
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar módulos do condomínio:', err);
+    } finally {
+      setLoadingModules(false);
+    }
+  };
+
+  const handleToggleModule = (key) => {
+    setCondoModules(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const handleSaveModules = async () => {
+    if (!selected) return;
+    setSavingModules(true);
+    try {
+      await api.updateCondominiumModules(selected, condoModules);
+      showToast('Módulos do condomínio atualizados com sucesso!', 'success');
+      window.dispatchEvent(new Event('condo-modules-changed'));
+    } catch (err) {
+      showToast(err.message || 'Erro ao salvar módulos do condomínio.', 'danger');
+    } finally {
+      setSavingModules(false);
+    }
+  };
+
   useEffect(() => { 
     if (selected) {
       api.setActiveCondominiumId(selected);
+      loadModulesForSelected(selected);
       Promise.all([
         api.getBlocks(selected),
         api.getUnits()
@@ -502,6 +560,136 @@ export default function CondominiumsBlocksView({ showToast }) {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+
+          {/* Gerenciamento de Módulos do Condomínio Selecionado */}
+          <div className="card">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div className="card-title">
+                <Sliders size={20} color="var(--brand-forest)" />
+                Módulos de {selectedCondoObj ? `"${selectedCondoObj.name}"` : 'Selecione um Condomínio'}
+              </div>
+              {selectedCondoObj && (
+                <button 
+                  className="btn btn-primary"
+                  onClick={handleSaveModules}
+                  disabled={savingModules || loadingModules || !selected}
+                  style={{ padding: '6px 14px', fontSize: '.85rem' }}
+                >
+                  <Check size={15} /> {savingModules ? 'Salvando...' : 'Salvar Alterações de Módulos'}
+                </button>
+              )}
+            </div>
+
+            {loadingModules ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                Carregando módulos do condomínio...
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: '.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+                  Defina quais módulos opcionais estão disponíveis para os usuários deste condomínio. As 3 áreas estruturais permanecem sempre ativas por padrão.
+                </p>
+
+                {/* Grid dos 6 Módulos Opcionais */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 20 }}>
+                  {[
+                    { key: 'dashboard', label: 'Dashboard & Indicadores', icon: LayoutDashboard, desc: 'Métricas consolidadas do condomínio' },
+                    { key: 'access', label: 'Portaria & Acessos', icon: ShieldCheck, desc: 'Entradas, saídas e registros de visitantes' },
+                    { key: 'deliveries', label: 'Controle de Encomendas', icon: Package, desc: 'Recebimento de encomendas e retirada com PIN' },
+                    { key: 'reservations', label: 'Reservas de Áreas Comuns', icon: CalendarDays, desc: 'Agendamento de churrasqueira, salão e quadra' },
+                    { key: 'financial', label: 'Gestão Financeira & Taxas', icon: DollarSign, desc: 'Lançamentos, receitas, despesas e boletos' },
+                    { key: 'market', label: 'Mercadinho & Estoque', icon: ShoppingCart, desc: 'PDV autônomo e controle de produtos' }
+                  ].map(mod => {
+                    const Icon = mod.icon;
+                    const isEnabled = Boolean(condoModules[mod.key]);
+                    return (
+                      <div 
+                        key={mod.key} 
+                        onClick={() => handleToggleModule(mod.key)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 14px',
+                          borderRadius: 'var(--radius-md)',
+                          border: isEnabled ? '1.5px solid var(--brand-forest)' : '1px solid var(--border-color)',
+                          background: isEnabled ? 'var(--accent-mint)' : 'var(--bg-primary)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ 
+                            width: 34, 
+                            height: 34, 
+                            borderRadius: 'var(--radius-sm)', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            background: isEnabled ? 'var(--bg-primary)' : 'var(--bg-card)',
+                            color: isEnabled ? 'var(--brand-forest)' : 'var(--text-muted)'
+                          }}>
+                            <Icon size={17} />
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '.88rem', color: 'var(--text-main)' }}>
+                              {mod.label}
+                            </div>
+                            <div style={{ fontSize: '.72rem', color: 'var(--text-muted)' }}>
+                              {mod.desc}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className={`badge ${isEnabled ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '.72rem' }}>
+                            {isEnabled ? '🟢 Ativo' : '⚪ Inativo'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Áreas Estruturais Obrigatórias */}
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
+                  <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.5px' }}>
+                    Áreas Estruturais Obrigatórias (Sempre Ativas)
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {[
+                      { label: 'Cadastro de Pessoas & Unidades', icon: Users },
+                      { label: 'Condomínios & Blocos', icon: Building2 },
+                      { label: 'Mural de Avisos', icon: Megaphone }
+                    ].map(area => {
+                      const AreaIcon = area.icon;
+                      return (
+                        <div 
+                          key={area.label} 
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '6px 12px',
+                            borderRadius: 'var(--radius-full)',
+                            background: 'var(--bg-primary)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '.78rem',
+                            color: 'var(--text-main)'
+                          }}
+                        >
+                          <AreaIcon size={14} color="var(--brand-forest)" />
+                          <span>{area.label}</span>
+                          <span className="badge badge-info" style={{ fontSize: '.68rem', padding: '2px 6px' }}>Obrigatório</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </div>

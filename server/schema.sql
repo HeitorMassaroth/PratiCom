@@ -223,6 +223,16 @@ CREATE TABLE IF NOT EXISTS app_features (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 15. Módulos Ativáveis por Condomínio
+CREATE TABLE IF NOT EXISTS condominium_modules (
+    condominium_id INTEGER NOT NULL,
+    module_key TEXT NOT NULL CHECK (module_key IN ('dashboard', 'access', 'deliveries', 'reservations', 'financial', 'market')),
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (condominium_id, module_key),
+    FOREIGN KEY (condominium_id) REFERENCES condominiums(id) ON DELETE CASCADE
+);
+
 -- Índices Otimizados
 CREATE INDEX IF NOT EXISTS idx_residents_unit ON residents(unit_id);
 CREATE INDEX IF NOT EXISTS idx_deliveries_status ON deliveries(status);
@@ -232,8 +242,9 @@ CREATE INDEX IF NOT EXISTS idx_financial_status ON financial_transactions(status
 CREATE INDEX IF NOT EXISTS idx_market_sale_items_sale ON market_sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_blocks_condominium ON blocks(condominium_id);
 CREATE INDEX IF NOT EXISTS idx_units_block ON units(block_id);
+CREATE INDEX IF NOT EXISTS idx_condo_modules_lookup ON condominium_modules(condominium_id, module_key, enabled);
 
 -- Seed: Condomínio padrão (criado apenas se a tabela estiver vazia)
 INSERT INTO condominiums (id, name, status)
 SELECT 1, 'Condomínio Padrão', 'ACTIVE'
-WHERE NOT EXISTS (SELECT 1 FROM condominiums);
+WHERE NOT EXISTS (SELECT 1 FROM condominiums);

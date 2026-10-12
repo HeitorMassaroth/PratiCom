@@ -55,6 +55,9 @@ export const api = {
   deleteBlock: (id) => request(`/blocks/${id}`, { method: 'DELETE' }),
   getPendingUnits: () => request('/territory/pending-units'),
   mapLegacyUnits: (blockId, legacy_block) => request(`/blocks/${blockId}/map-legacy-units`, { method: 'PATCH', body: JSON.stringify({ legacy_block }) }),
+  getCondominiumModules: (id) => request(`/condominiums/${id}/modules`),
+  updateCondominiumModules: (id, modules) => request(`/condominiums/${id}/modules`, { method: 'PUT', body: JSON.stringify({ modules }) }),
+  getActiveCondominiumModules: () => request('/condominiums/active/modules'),
   // Dashboard
   getDashboard: () => request('/dashboard'),
 

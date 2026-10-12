@@ -28,6 +28,22 @@ async function runIsolationVerification() {
     const newCondo = await condoRes.json();
     console.log(`✅ Condomínio criado com sucesso! ID: ${newCondo.id}, Nome: "${newCondo.name}"`);
 
+    // Habilita os módulos para validar o isolamento das tabelas operacionais
+    await fetch(`${BASE_URL}/condominiums/${newCondo.id}/modules`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        modules: {
+          dashboard: true,
+          access: true,
+          deliveries: true,
+          reservations: true,
+          financial: true,
+          market: true
+        }
+      })
+    });
+
     const gamaHeaders = {
       'Content-Type': 'application/json',
       'X-Condominium-Id': String(newCondo.id)

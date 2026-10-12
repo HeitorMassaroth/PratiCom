@@ -161,14 +161,15 @@ export class AnnouncementDAO {
     return this.db.prepare(sql).all(params);
   }
 
-  createAnnouncement(data) {
+  createAnnouncement(data, condominiumId) {
     const stmt = this.db.prepare(`
       INSERT INTO announcements (condominium_id, title, content, category, priority, author, target_block, is_pinned, expires_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    const condoId = data?.condominium_id || condominiumId || null;
     const info = stmt.run(
-      data.condominium_id ? parseInt(data.condominium_id, 10) : null,
+      condoId ? parseInt(condoId, 10) : null,
       data.title,
       data.content,
       data.category || 'Geral',

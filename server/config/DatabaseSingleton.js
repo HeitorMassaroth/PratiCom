@@ -57,6 +57,33 @@ class DatabaseSingleton {
     addColumnIfMissing('access_logs', 'company TEXT');
     addColumnIfMissing('access_logs', 'vehicle_plate TEXT');
     addColumnIfMissing('access_logs', 'authorized_by TEXT');
+
+    // Módulos ativáveis por condomínio
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS condominium_modules (
+          condominium_id INTEGER NOT NULL,
+          module_key TEXT NOT NULL CHECK (module_key IN ('dashboard', 'access', 'deliveries', 'reservations', 'financial', 'market')),
+          enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (condominium_id, module_key),
+          FOREIGN KEY (condominium_id) REFERENCES condominiums(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_condo_modules_lookup 
+      ON condominium_modules(condominium_id, module_key, enabled);
+    `);
+
+    // Seed de retrocompatibilidade para condomínios existentes sem módulos
+    const condos = this.db.prepare("SELECT id FROM condominiums").all();
+    const defaultModules = ['dashboard', 'access', 'deliveries', 'reservations', 'financial', 'market'];
+    const insertModule = this.db.prepare(`
+      INSERT OR IGNORE INTO condominium_modules (condominium_id, module_key, enabled)
+      VALUES (?, ?, 1)
+    `);
+    for (const c of condos) {
+      for (const m of defaultModules) {
+        insertModule.run(c.id, m);
+      }
+    }
   }
 }
 
