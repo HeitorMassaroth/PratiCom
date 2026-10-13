@@ -57,6 +57,12 @@ class DatabaseSingleton {
     addColumnIfMissing('access_logs', 'company TEXT');
     addColumnIfMissing('access_logs', 'vehicle_plate TEXT');
     addColumnIfMissing('access_logs', 'authorized_by TEXT');
+    addColumnIfMissing('deliveries', 'registered_at DATETIME');
+    addColumnIfMissing('deliveries', 'registered_by TEXT');
+    addColumnIfMissing('deliveries', 'received_by TEXT');
+    addColumnIfMissing('deliveries', 'cancelled_at DATETIME');
+    addColumnIfMissing('deliveries', 'cancelled_by TEXT');
+    addColumnIfMissing('deliveries', 'cancellation_reason TEXT');
 
     // Módulos ativáveis por condomínio
     this.db.exec(`

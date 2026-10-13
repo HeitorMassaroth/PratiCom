@@ -92,7 +92,7 @@ app.get('/api/dashboard', checkModuleAvailability('dashboard'), async (req, res)
     const hasReservations = condominiumDAO.isModuleEnabled(condominiumId, 'reservations');
 
     const deliveries = hasDeliveries ? deliveryDAO.getDeliveries({ condominiumId }) : [];
-    const pendingDeliveries = deliveries.filter(d => d.status === 'pending' || d.status === 'PENDING');
+    const pendingDeliveries = deliveries.filter(d => ['pending', 'PENDING', 'RECEBIDA'].includes(d.status));
 
     const accessLogs = hasAccess ? accessDAO.getAccessLogs({ condominiumId }) : [];
     const activeAccess = accessLogs.filter(a => a.status === 'IN_PROPERTY' || a.status === 'inside');
@@ -137,16 +137,38 @@ app.get('/api/deliveries', checkModuleAvailability('deliveries'), (req, res) => 
   }
 });
 
+app.get('/api/deliveries/:id', checkModuleAvailability('deliveries'), (req, res) => {
+  try {
+    const delivery = deliveryDAO.getDeliveryById(req.params.id, { condominiumId: req.condominiumId });
+    if (!delivery) {
+      return res.status(404).json({ error: 'Encomenda não encontrada ou não pertence ao condomínio ativo.' });
+    }
+    res.json(delivery);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/deliveries', checkModuleAvailability('deliveries'), (req, res) => {
   try {
     const { unit_id, courier } = req.body;
     if (!unit_id || !courier) {
       return res.status(400).json({ error: 'Unidade e transportadora são obrigatórios.' });
     }
-    const created = deliveryDAO.createDelivery(req.body);
+    const created = deliveryDAO.createDelivery(req.body, { condominiumId: req.condominiumId });
     res.status(201).json(created);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/deliveries/:id', checkModuleAvailability('deliveries'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated = deliveryDAO.updateDelivery(id, req.body, { condominiumId: req.condominiumId });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -159,8 +181,37 @@ app.patch('/api/deliveries/:id/pickup', checkModuleAvailability('deliveries'), (
     const isAdvanced = AppConfigSingleton.isFeatureEnabled('ENABLE_ADVANCED_DELIVERIES');
     const codeToVerify = isAdvanced ? pickup_code : null;
 
-    const updated = deliveryDAO.pickupDelivery(id, { pickup_code: codeToVerify, picked_up_by });
+    const updated = deliveryDAO.pickupDelivery(id, { 
+      pickup_code: codeToVerify, 
+      picked_up_by, 
+      condominiumId: req.condominiumId 
+    });
     res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/deliveries/:id/cancel', checkModuleAvailability('deliveries'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, cancelled_by } = req.body;
+    const cancelled = deliveryDAO.cancelDelivery(id, {
+      reason,
+      cancelledBy: cancelled_by,
+      condominiumId: req.condominiumId
+    });
+    res.json(cancelled);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/deliveries/:id', checkModuleAvailability('deliveries'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = deliveryDAO.deleteDelivery(id, { condominiumId: req.condominiumId });
+    res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

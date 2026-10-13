@@ -219,8 +219,10 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
                         </span>
                       </td>
                       <td>
-                        {pkg.status === 'pending' ? (
+                        {['pending', 'PENDING', 'RECEBIDA'].includes(pkg.status) ? (
                           <span className="badge badge-warning">Aguardando</span>
+                        ) : ['cancelled', 'CANCELLED', 'CANCELADA'].includes(pkg.status) ? (
+                          <span className="badge badge-secondary" style={{ opacity: 0.7 }}>Cancelada</span>
                         ) : (
                           <span className="badge badge-success">Entregue</span>
                         )}
