@@ -52,3 +52,10 @@ export class CondoFeePaymentProcessor extends AbstractPaymentProcessor {
     return { success: true, authCode: `CONDO-FEE-UNIT-${unitId}` };
   }
 }
+
+export class CardPaymentProcessor extends AbstractPaymentProcessor {
+  authorizePayment(amount, unitId) {
+    // Simula autorização na maquininha de cartão (débito/crédito)
+    return { success: true, authCode: `CARD-${Math.floor(100000 + Math.random() * 900000)}` };
+  }
+}

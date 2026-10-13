@@ -14,13 +14,26 @@ import {
   Trash2,
   Building,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Pencil
 } from 'lucide-react';
 import { api } from '../services/api';
+
+const EMPTY_PRODUCT = {
+  name: '',
+  barcode: '',
+  category: 'Bebidas',
+  cost_price: '',
+  sale_price: '',
+  stock_quantity: '',
+  min_stock: '5',
+  image_url: '📦'
+};
 
 export default function MarketInventoryView({ showToast }) {
   const [products, setProducts] = useState([]);
   const [units, setUnits] = useState([]);
+  const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [featureDisabled, setFeatureDisabled] = useState(false);
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'pos'
@@ -30,35 +43,37 @@ export default function MarketInventoryView({ showToast }) {
   // Carrinho do PDV
   const [cart, setCart] = useState([]);
   const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [selectedResidentId, setSelectedResidentId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('condo_bill');
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
 
-  // Modal Novo Produto
+  // Modal Produto (null = criando, objeto = editando)
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
-  const [newProductForm, setNewProductForm] = useState({
-    name: '',
-    barcode: '',
-    category: 'Bebidas',
-    cost_price: '',
-    sale_price: '',
-    stock_quantity: '',
-    min_stock: '5',
-    image_url: '📦'
-  });
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [newProductForm, setNewProductForm] = useState(EMPTY_PRODUCT);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setFeatureDisabled(false);
-      const [prodRes, unitRes] = await Promise.all([
+      const [prodRes, unitRes, resRes] = await Promise.all([
         api.getMarketProducts({ category: categoryFilter }),
-        api.getUnits()
+        api.getUnits(),
+        api.getResidents()
       ]);
-      setProducts(Array.isArray(prodRes) ? prodRes : []);
+      const prods = Array.isArray(prodRes) ? prodRes : [];
+      setProducts(prods);
       setUnits(Array.isArray(unitRes) ? unitRes : []);
+      setResidents(Array.isArray(resRes) ? resRes : []);
+      // Mantém o preço exibido no carrinho igual ao do banco (o checkout cobra o preço do banco)
+      setCart(prev => prev.map(item => {
+        const p = prods.find(prod => prod.id === item.product_id);
+        return p ? { ...item, price: p.sale_price } : item;
+      }));
     } catch (err) {
       setProducts([]);
       setUnits([]);
+      setResidents([]);
       if (err.message && (err.message.includes('LPS') || err.message.includes('ENABLE_MARKETPLACE') || err.message.includes('desativada'))) {
         setFeatureDisabled(true);
       } else {
@@ -93,35 +108,70 @@ export default function MarketInventoryView({ showToast }) {
     }
   };
 
-  const handleCreateProduct = async (e) => {
+  const openCreateProductModal = () => {
+    setEditingProduct(null);
+    setNewProductForm(EMPTY_PRODUCT);
+    setIsNewProductModalOpen(true);
+  };
+
+  const openEditProductModal = (prod) => {
+    setEditingProduct(prod);
+    setNewProductForm({
+      name: prod.name || '',
+      barcode: prod.barcode || '',
+      category: prod.category || 'Bebidas',
+      cost_price: String(prod.cost_price ?? ''),
+      sale_price: String(prod.sale_price ?? ''),
+      stock_quantity: String(prod.stock_quantity ?? ''),
+      min_stock: String(prod.min_stock ?? '5'),
+      image_url: prod.image_url || '📦'
+    });
+    setIsNewProductModalOpen(true);
+  };
+
+  const closeProductModal = () => {
+    setIsNewProductModalOpen(false);
+    setEditingProduct(null);
+    setNewProductForm(EMPTY_PRODUCT);
+  };
+
+  const handleSubmitProduct = async (e) => {
     e.preventDefault();
     if (!newProductForm.name || !newProductForm.sale_price) {
       showToast('Nome e preço de venda são obrigatórios.', 'warning');
       return;
     }
+    const payload = {
+      ...newProductForm,
+      cost_price: parseFloat(newProductForm.cost_price) || 0,
+      sale_price: parseFloat(newProductForm.sale_price),
+      stock_quantity: parseInt(newProductForm.stock_quantity, 10) || 0,
+      min_stock: parseInt(newProductForm.min_stock, 10) || 5
+    };
     try {
-      await api.createMarketProduct({
-        ...newProductForm,
-        cost_price: parseFloat(newProductForm.cost_price) || 0,
-        sale_price: parseFloat(newProductForm.sale_price),
-        stock_quantity: parseInt(newProductForm.stock_quantity, 10) || 0,
-        min_stock: parseInt(newProductForm.min_stock, 10) || 5
-      });
-      showToast('Produto cadastrado com sucesso no mercadinho!', 'success');
-      setIsNewProductModalOpen(false);
-      setNewProductForm({
-        name: '',
-        barcode: '',
-        category: 'Bebidas',
-        cost_price: '',
-        sale_price: '',
-        stock_quantity: '',
-        min_stock: '5',
-        image_url: '📦'
-      });
+      if (editingProduct) {
+        await api.updateMarketProduct(editingProduct.id, payload);
+        showToast('Produto atualizado com sucesso!', 'success');
+      } else {
+        await api.createMarketProduct(payload);
+        showToast('Produto cadastrado com sucesso no mercadinho!', 'success');
+      }
+      closeProductModal();
       loadData();
     } catch (err) {
-      showToast(err.message || 'Erro ao cadastrar produto.', 'danger');
+      showToast(err.message || 'Erro ao salvar produto.', 'danger');
+    }
+  };
+
+  const handleDeleteProduct = async (prod) => {
+    if (!window.confirm(`Deseja realmente excluir o produto ${prod.name}? O histórico de vendas será mantido.`)) return;
+    try {
+      await api.deleteMarketProduct(prod.id);
+      setCart(prev => prev.filter(item => item.product_id !== prod.id));
+      showToast(`Produto ${prod.name} excluído.`, 'info');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao excluir produto.', 'danger');
     }
   };
 
@@ -167,22 +217,23 @@ export default function MarketInventoryView({ showToast }) {
       showToast('O carrinho está vazio.', 'warning');
       return;
     }
-    if (paymentMethod === 'condo_bill' && !selectedUnitId) {
-      showToast('Selecione o apartamento para débito no boleto.', 'warning');
+    if (!selectedUnitId || !selectedResidentId) {
+      showToast('Selecione a unidade e o morador que está comprando.', 'warning');
       return;
     }
 
     try {
-      const selectedUnit = units.find(u => u.id === parseInt(selectedUnitId, 10));
-      await api.checkoutMarket({
-        unit_id: selectedUnitId ? parseInt(selectedUnitId, 10) : null,
-        resident_name: selectedUnit ? `${selectedUnit.block} - Apto ${selectedUnit.number}` : 'Autoatendimento',
+      // Envia só produto e quantidade; preço e total são calculados pelo backend com os valores do banco
+      const sale = await api.checkoutMarket({
+        unit_id: parseInt(selectedUnitId, 10),
+        resident_id: parseInt(selectedResidentId, 10),
         payment_method: paymentMethod,
-        items: cart
+        items: cart.map(item => ({ product_id: item.product_id, quantity: item.quantity }))
       });
 
-      showToast(`Compra finalizada com sucesso! Total: R$ ${cartTotal.toFixed(2)}`, 'success');
+      showToast(`Compra finalizada com sucesso! Total: R$ ${Number(sale.total_amount).toFixed(2)}`, 'success');
       setCart([]);
+      setSelectedResidentId('');
       setIsCheckoutModalOpen(false);
       loadData();
     } catch (err) {
@@ -242,7 +293,7 @@ export default function MarketInventoryView({ showToast }) {
         </div>
 
         {activeTab === 'inventory' && (
-          <button className="btn btn-primary" onClick={() => setIsNewProductModalOpen(true)}>
+          <button className="btn btn-primary" onClick={openCreateProductModal}>
             <Plus size={18} /> Novo Produto no Mercadinho
           </button>
         )}
@@ -310,7 +361,7 @@ export default function MarketInventoryView({ showToast }) {
                     <th>Margem</th>
                     <th>Estoque Atual</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Ajuste Rápido</th>
+                    <th style={{ textAlign: 'right' }}>Ajuste Rápido / Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -388,6 +439,20 @@ export default function MarketInventoryView({ showToast }) {
                                 title="Repor pacote com 10 unidades"
                               >
                                 +10
+                              </button>
+                              <button
+                                style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: '4px' }}
+                                title="Editar produto"
+                                onClick={() => openEditProductModal(prod)}
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              <button
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px' }}
+                                title="Excluir produto"
+                                onClick={() => handleDeleteProduct(prod)}
+                              >
+                                <Trash2 size={15} />
                               </button>
                             </div>
                           </td>
@@ -633,24 +698,43 @@ export default function MarketInventoryView({ showToast }) {
                 </div>
               </div>
 
-              {paymentMethod === 'condo_bill' && (
-                <div className="form-group" style={{ marginTop: '16px' }}>
-                  <label>Identifique seu Apartamento para Cobrança *</label>
+              <div className="form-row" style={{ marginTop: '16px' }}>
+                <div className="form-group">
+                  <label>Sua Unidade *</label>
                   <select
                     className="form-control"
                     required
                     value={selectedUnitId}
-                    onChange={(e) => setSelectedUnitId(e.target.value)}
+                    onChange={(e) => { setSelectedUnitId(e.target.value); setSelectedResidentId(''); }}
                   >
                     <option value="">Selecione sua Unidade</option>
                     {units.map((u) => (
                       <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
                     ))}
                   </select>
-                  <small style={{ color: 'var(--text-dim)', display: 'block', marginTop: '4px' }}>
-                    O valor de R$ {cartTotal.toFixed(2)} será lançado automaticamente na próxima taxa condominial da sua unidade.
-                  </small>
                 </div>
+
+                <div className="form-group">
+                  <label>Morador *</label>
+                  <select
+                    className="form-control"
+                    required
+                    disabled={!selectedUnitId}
+                    value={selectedResidentId}
+                    onChange={(e) => setSelectedResidentId(e.target.value)}
+                  >
+                    <option value="">{selectedUnitId ? 'Selecione o Morador' : 'Escolha a unidade primeiro'}</option>
+                    {residents.filter(r => r.unit_id === parseInt(selectedUnitId, 10)).map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {paymentMethod === 'condo_bill' && (
+                <small style={{ color: 'var(--text-dim)', display: 'block', marginTop: '4px' }}>
+                  O valor de R$ {cartTotal.toFixed(2)} será lançado automaticamente na próxima taxa condominial da sua unidade.
+                </small>
               )}
 
               {paymentMethod === 'pix' && (
@@ -682,13 +766,16 @@ export default function MarketInventoryView({ showToast }) {
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <PackagePlus size={20} color="var(--accent-primary)" /> Cadastrar Produto no Mercadinho
+                {editingProduct
+                  ? <><Pencil size={20} color="var(--accent-primary)" /> Editar Produto</>
+                  : <><PackagePlus size={20} color="var(--accent-primary)" /> Cadastrar Produto no Mercadinho</>
+                }
               </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsNewProductModalOpen(false)}>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeProductModal}>
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreateProduct}>
+            <form onSubmit={handleSubmitProduct}>
               <div className="modal-body">
                 <div className="form-group">
                   <label>Nome do Produto *</label>
@@ -795,11 +882,11 @@ export default function MarketInventoryView({ showToast }) {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsNewProductModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeProductModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Salvar Produto
+                  {editingProduct ? 'Salvar Alterações' : 'Salvar Produto'}
                 </button>
               </div>
             </form>

@@ -11,9 +11,20 @@ import {
   Filter,
   CheckCircle2,
   Clock,
-  Building
+  Building,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
+
+const EMPTY_DELIVERY = {
+  unit_id: '',
+  resident_id: '',
+  courier: 'Mercado Livre',
+  tracking_code: '',
+  description: '',
+  notes: ''
+};
 
 export default function DeliveriesView({ showToast }) {
   const [deliveries, setDeliveries] = useState([]);
@@ -30,15 +41,11 @@ export default function DeliveriesView({ showToast }) {
   const [pickupPinInput, setPickupPinInput] = useState('');
   const [pickedUpByInput, setPickedUpByInput] = useState('');
 
-  // Form de nova encomenda
-  const [formData, setFormData] = useState({
-    unit_id: '',
-    resident_id: '',
-    courier: 'Mercado Livre',
-    tracking_code: '',
-    description: '',
-    notes: ''
-  });
+  // null = criando, objeto = editando
+  const [editingDelivery, setEditingDelivery] = useState(null);
+
+  // Form de encomenda
+  const [formData, setFormData] = useState(EMPTY_DELIVERY);
 
   const loadData = async () => {
     try {
@@ -62,20 +69,60 @@ export default function DeliveriesView({ showToast }) {
     loadData();
   }, [statusFilter]);
 
-  const handleCreate = async (e) => {
+  const openCreateModal = () => {
+    setEditingDelivery(null);
+    setFormData(EMPTY_DELIVERY);
+    setIsNewModalOpen(true);
+  };
+
+  const openEditModal = (pkg) => {
+    setEditingDelivery(pkg);
+    setFormData({
+      unit_id: String(pkg.unit_id),
+      resident_id: pkg.resident_id ? String(pkg.resident_id) : '',
+      courier: pkg.courier || 'Mercado Livre',
+      tracking_code: pkg.tracking_code || '',
+      description: pkg.description || '',
+      notes: pkg.notes || ''
+    });
+    setIsNewModalOpen(true);
+  };
+
+  const closeDeliveryModal = () => {
+    setIsNewModalOpen(false);
+    setEditingDelivery(null);
+    setFormData(EMPTY_DELIVERY);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.unit_id || !formData.courier) {
       showToast('Preencha os campos obrigatórios.', 'warning');
       return;
     }
     try {
-      const created = await api.createDelivery(formData);
-      showToast(`Encomenda cadastrada! PIN de retirada gerado: ${created.pickup_code}`, 'success');
-      setIsNewModalOpen(false);
-      setFormData({ unit_id: '', resident_id: '', courier: 'Mercado Livre', tracking_code: '', description: '', notes: '' });
+      if (editingDelivery) {
+        await api.updateDelivery(editingDelivery.id, formData);
+        showToast('Encomenda atualizada com sucesso!', 'success');
+      } else {
+        const created = await api.createDelivery(formData);
+        showToast(`Encomenda cadastrada! PIN de retirada gerado: ${created.pickup_code}`, 'success');
+      }
+      closeDeliveryModal();
       loadData();
     } catch (err) {
-      showToast(err.message || 'Erro ao registrar encomenda.', 'danger');
+      showToast(err.message || 'Erro ao salvar encomenda.', 'danger');
+    }
+  };
+
+  const handleDelete = async (pkg) => {
+    if (!window.confirm(`Deseja realmente excluir a encomenda ${pkg.courier} do ${pkg.block} - Apto ${pkg.unit_number}?`)) return;
+    try {
+      await api.deleteDelivery(pkg.id);
+      showToast('Encomenda excluída.', 'info');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao excluir encomenda.', 'danger');
     }
   };
 
@@ -140,7 +187,7 @@ export default function DeliveriesView({ showToast }) {
           </select>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
+        <button className="btn btn-primary" onClick={openCreateModal}>
           <Plus size={18} /> Registrar Recebimento de Pacote
         </button>
       </div>
@@ -235,11 +282,34 @@ export default function DeliveriesView({ showToast }) {
                           >
                             <CheckCircle size={14} /> Dar Baixa
                           </button>
+                          <button
+                            style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: '4px' }}
+                            title="Editar encomenda"
+                            onClick={() => openEditModal(pkg)}
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px' }}
+                            title="Excluir encomenda"
+                            onClick={() => handleDelete(pkg)}
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       ) : (
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                          Por: {pkg.picked_up_by || 'Morador'}
-                        </span>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+                            Por: {pkg.picked_up_by || 'Morador'}
+                          </span>
+                          <button
+                            style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px' }}
+                            title="Excluir encomenda"
+                            onClick={() => handleDelete(pkg)}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -256,13 +326,16 @@ export default function DeliveriesView({ showToast }) {
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Package size={20} color="var(--accent-primary)" /> Registrar Encomenda
+                {editingDelivery
+                  ? <><Pencil size={20} color="var(--accent-primary)" /> Editar Encomenda</>
+                  : <><Package size={20} color="var(--accent-primary)" /> Registrar Encomenda</>
+                }
               </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsNewModalOpen(false)}>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeDeliveryModal}>
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div className="form-group">
                   <label>Unidade de Destino *</label>
@@ -350,11 +423,11 @@ export default function DeliveriesView({ showToast }) {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsNewModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeDeliveryModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Registrar e Gerar PIN
+                  {editingDelivery ? 'Salvar Alterações' : 'Registrar e Gerar PIN'}
                 </button>
               </div>
             </form>
