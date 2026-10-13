@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS units (
     floor INTEGER,
     type TEXT DEFAULT 'Residencial',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(block, number),
+    UNIQUE(block_id, number),
     FOREIGN KEY (block_id) REFERENCES blocks(id) ON DELETE RESTRICT
 );
 

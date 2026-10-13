@@ -241,6 +241,120 @@ async function runTestSuite() {
     failCount++;
   }
 
+  // Validação de Unicidade de Blocos e Apartamentos
+  try {
+    console.log('\n--- Teste de Unicidade de Blocos e Apartamentos ---');
+    
+    // 1. Criar Bloco no Condomínio 1
+    const block1Res = await fetch(`${apiBase}/api/condominiums/1/blocks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Torre Unicidade Teste' })
+    });
+    const block1 = await block1Res.json();
+    if (block1Res.status === 201) {
+      console.log(`✅ [201 Created] Bloco criado no Condomínio 1 -> ID: ${block1.id}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao criar bloco 1: ${JSON.stringify(block1)}`);
+    }
+
+    // 2. Bloquear duplicata do mesmo bloco no mesmo condomínio
+    const blockDupRes = await fetch(`${apiBase}/api/condominiums/1/blocks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Torre Unicidade Teste' })
+    });
+    if (blockDupRes.status === 409) {
+      console.log('✅ [409 Conflict] Bloco com mesmo nome bloqueado no mesmo condomínio.');
+      successCount++;
+    } else {
+      console.error('❌ Duplicata de bloco permitida indevidamente.');
+      failCount++;
+    }
+
+    // 3. Bloquear duplicata case-insensitive ('torre unicidade teste')
+    const blockCaseRes = await fetch(`${apiBase}/api/condominiums/1/blocks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'torre unicidade teste' })
+    });
+    if (blockCaseRes.status === 409) {
+      console.log('✅ [409 Conflict] Bloco duplicado case-insensitive bloqueado com sucesso.');
+      successCount++;
+    } else {
+      console.error('❌ Duplicata case-insensitive de bloco permitida indevidamente.');
+      failCount++;
+    }
+
+    // 4. Permitir mesmo nome de bloco no Condomínio 4 (outro condomínio)
+    const block2Res = await fetch(`${apiBase}/api/condominiums/4/blocks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Torre Unicidade Teste' })
+    });
+    const block2 = await block2Res.json();
+    if (block2Res.status === 201) {
+      console.log(`✅ [201 Created] Mesmo nome de bloco permitido em condomínio diferente -> ID: ${block2.id}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao permitir mesmo bloco em condomínio 4: ${JSON.stringify(block2)}`);
+    }
+
+    // 5. Criar Apto 909 no Condomínio 1
+    const unit1Res = await fetch(`${apiBase}/api/units`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '1' },
+      body: JSON.stringify({ block_id: block1.id, number: '909' })
+    });
+    const unit1 = await unit1Res.json();
+    if (unit1Res.status === 201) {
+      console.log(`✅ [201 Created] Apto 909 criado no Condomínio 1 -> ID: ${unit1.id}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao criar Apto 909 no Condomínio 1: ${JSON.stringify(unit1)}`);
+    }
+
+    // 6. Criar Apto 909 no Condomínio 4 (mesmo nome de bloco e mesmo número de apto em condomínios diferentes)
+    const unit2Res = await fetch(`${apiBase}/api/units`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '4' },
+      body: JSON.stringify({ block_id: block2.id, number: '909' })
+    });
+    const unit2 = await unit2Res.json();
+    if (unit2Res.status === 201) {
+      console.log(`✅ [201 Created] Apto 909 de mesmo bloco permitido em condomínio diferente -> ID: ${unit2.id}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao permitir Apto 909 no Condomínio 4: ${JSON.stringify(unit2)}`);
+    }
+
+    // 7. Bloquear Apto 909 duplicado no mesmo bloco do Condomínio 1
+    const unitDupRes = await fetch(`${apiBase}/api/units`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '1' },
+      body: JSON.stringify({ block_id: block1.id, number: '909' })
+    });
+    if (unitDupRes.status === 409) {
+      console.log('✅ [409 Conflict] Apto 909 duplicado no mesmo bloco bloqueado com sucesso.');
+      successCount++;
+    } else {
+      console.error('❌ Apto duplicado no mesmo bloco permitido indevidamente.');
+      failCount++;
+    }
+
+    // Limpeza dos dados de teste
+    await fetch(`${apiBase}/api/units/${unit1.id}`, { method: 'DELETE' });
+    await fetch(`${apiBase}/api/units/${unit2.id}`, { method: 'DELETE' });
+    await fetch(`${apiBase}/api/blocks/${block1.id}`, { method: 'DELETE' });
+    await fetch(`${apiBase}/api/blocks/${block2.id}`, { method: 'DELETE' });
+    console.log('✅ Limpeza dos registros de teste de unicidade concluída.');
+    successCount++;
+  } catch (err) {
+    console.error('❌ Erro na validação de unicidade de blocos e unidades:', err.message);
+    failCount++;
+  }
+
   // 3. Testes de Feature Flags (LPS)
   console.log('\n--- 3. Validação de Feature Flags da LPS ---');
   try {

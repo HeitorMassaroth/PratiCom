@@ -57,7 +57,7 @@ export class ResidentDAO {
     };
   }
 
-  createUnit(data) {
+  createUnit(data, { condominiumId } = {}) {
     if (!data.number || !String(data.number).trim()) {
       throw new Error('Número da unidade é obrigatório.');
     }
@@ -71,10 +71,18 @@ export class ResidentDAO {
       throw new Error('Bloco não encontrado.');
     }
 
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      const bCondoId = blockObj.condominium_id ?? 1;
+      if (cId === 1 ? (blockObj.condominium_id && blockObj.condominium_id !== 1) : bCondoId !== cId) {
+        throw new Error('O bloco selecionado não pertence ao condomínio atual.');
+      }
+    }
+
     const numberStr = String(data.number).trim();
 
-    // Validar duplicidade no mesmo bloco
-    const existing = this.db.prepare('SELECT id FROM units WHERE block_id = ? AND number = ?').get(blockId, numberStr);
+    // Validar duplicidade no mesmo bloco (case-insensitive)
+    const existing = this.db.prepare('SELECT id FROM units WHERE block_id = ? AND LOWER(TRIM(number)) = LOWER(?)').get(blockId, numberStr);
     if (existing) {
       throw new Error(`A unidade '${numberStr}' já está cadastrada no bloco '${blockObj.name}'.`);
     }
@@ -95,7 +103,7 @@ export class ResidentDAO {
     return this.getUnit(info.lastInsertRowid);
   }
 
-  updateUnit(id, data) {
+  updateUnit(id, data, { condominiumId } = {}) {
     const unit = this.getUnit(id);
     if (!unit) {
       throw new Error('Unidade não encontrada.');
@@ -111,10 +119,18 @@ export class ResidentDAO {
       throw new Error('Bloco não encontrado.');
     }
 
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      const bCondoId = blockObj.condominium_id ?? 1;
+      if (cId === 1 ? (blockObj.condominium_id && blockObj.condominium_id !== 1) : bCondoId !== cId) {
+        throw new Error('O bloco selecionado não pertence ao condomínio atual.');
+      }
+    }
+
     const numberStr = String(data.number).trim();
 
-    // Validar duplicidade se alterou o número ou o bloco
-    const existing = this.db.prepare('SELECT id FROM units WHERE block_id = ? AND number = ? AND id != ?').get(blockId, numberStr, parseInt(id, 10));
+    // Validar duplicidade se alterou o número ou o bloco (case-insensitive)
+    const existing = this.db.prepare('SELECT id FROM units WHERE block_id = ? AND LOWER(TRIM(number)) = LOWER(?) AND id != ?').get(blockId, numberStr, parseInt(id, 10));
     if (existing) {
       throw new Error(`A unidade '${numberStr}' já existe no bloco '${blockObj.name}'.`);
     }
