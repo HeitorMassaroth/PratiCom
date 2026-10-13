@@ -455,14 +455,6 @@ app.delete('/api/vehicles/:id', (req, res) => {
   }
 });
 
-app.get('/api/pets', (req, res) => {
-  try {
-    const pets = residentDAO.getPets({ condominiumId: req.condominiumId });
-    res.json(pets);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ==========================================
 // ==========================================
@@ -713,6 +705,21 @@ app.patch('/api/config/features', (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+app.use((err, req, res, next) => {
+  console.error('❌ Erro na requisição:', err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: err.message || 'Erro interno do servidor.' });
+  }
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('❌ Exceção não capturada:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Rejeição de Promise não tratada:', reason);
 });
 
 app.listen(PORT, () => {

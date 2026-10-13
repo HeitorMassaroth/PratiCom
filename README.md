@@ -46,7 +46,6 @@ A aplicação conta com arquitetura desacoplada (Frontend SPA em React + Backend
 * Gerenciamento de blocos e unidades condominiais.
 * Cadastro de moradores com dados de contato e vínculos.
 * Registro de veículos (placa, modelo e vaga) para liberação na portaria.
-* Cadastro e identificação de animais de estimação (pets).
 
 ### 📅 5. Reservas de Espaços Comuns
 * Agendamento de churrasqueiras, salão de festas, academia, quadras e espaços gourmet.
@@ -182,7 +181,7 @@ npm run dev
 | | `POST` | `/api/residents` | Cadastro de novo morador |
 | | `DELETE` | `/api/residents/:id` | Remoção de morador |
 | **Unidades** | `GET` | `/api/units` | Lista de apartamentos/unidades |
-| **Veículos & Pets** | `GET` | `/api/vehicles`, `/api/pets` | Listagem de veículos e animais cadastrados |
+| **Veículos** | `GET` | `/api/vehicles` | Listagem de veículos cadastrados |
 | **Reservas** | `GET` | `/api/reservations` | Consulta de reservas por data/espaço |
 | | `POST` | `/api/reservations` | Realização de nova reserva |
 | | `PATCH` | `/api/reservations/:id/cancel` | Cancelamento de reserva |

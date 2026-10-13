@@ -180,4 +180,22 @@ export class DeliveryDAO {
     stmt.run(picked_up_by || 'Morador', delivery.id);
     return this.getDelivery(delivery.id);
   }
+
+  cancelDelivery(id, options = {}, condominiumId) {
+    const cId = condominiumId || options?.condominiumId;
+    const delivery = this.getDelivery(id, cId);
+    if (!delivery) {
+      throw new Error('Encomenda não encontrada.');
+    }
+    if (delivery.status === 'delivered') {
+      throw new Error('Não é possível cancelar uma encomenda que já foi retirada.');
+    }
+    const stmt = this.db.prepare(`
+      UPDATE deliveries
+      SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancelled_by = ?, cancellation_reason = ?
+      WHERE id = ?
+    `);
+    stmt.run(options?.cancelledBy || options?.cancelled_by || 'Portaria', options?.reason || 'Cancelada pela portaria', delivery.id);
+    return this.getDelivery(delivery.id);
+  }
 }

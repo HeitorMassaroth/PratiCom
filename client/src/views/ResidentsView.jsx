@@ -4,7 +4,6 @@ import {
   UserPlus,
   Building2,
   Car,
-  Heart,
   Phone,
   Mail,
   Trash2,
@@ -42,7 +41,6 @@ export default function ResidentsView({ showToast }) {
   const [units, setUnits] = useState([]);
   const [residents, setResidents] = useState([]);
   const [vehicles, setVehicles] = useState([]);
-  const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnitId, setSelectedUnitId] = useState('');
@@ -64,16 +62,14 @@ export default function ResidentsView({ showToast }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [unitRes, resRes, vehRes, petRes] = await Promise.all([
+      const [unitRes, resRes, vehRes] = await Promise.all([
         api.getUnits(),
         api.getResidents({ search: searchTerm, unit_id: selectedUnitId }),
-        api.getVehicles(),
-        api.getPets()
+        api.getVehicles()
       ]);
       setUnits(unitRes);
       setResidents(resRes);
       setVehicles(vehRes);
-      setPets(petRes);
     } catch (err) {
       showToast('Erro ao carregar dados de moradores.', 'danger');
     } finally {
@@ -422,7 +418,6 @@ export default function ResidentsView({ showToast }) {
         ) : (
           residents.map((res) => {
             const resVehicles = vehicles.filter(v => v.resident_id === res.id || v.unit_id === res.unit_id);
-            const resPets = pets.filter(p => p.unit_id === res.unit_id);
 
             return (
               <div key={res.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -482,21 +477,15 @@ export default function ResidentsView({ showToast }) {
                   </div>
                 </div>
 
-                {/* Seção de Veículos e Pets da Unidade */}
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {resVehicles.length > 0 && (
+                {/* Seção de Veículos da Unidade */}
+                {resVehicles.length > 0 && (
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                       <Car size={13} color="var(--accent-purple)" />
                       {resVehicles.map(v => `${v.model} (${v.plate})`).join(' • ')}
                     </div>
-                  )}
-                  {resPets.length > 0 && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <Heart size={13} color="#f43f5e" />
-                      {resPets.map(p => `${p.name} (${p.type})`).join(' • ')}
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             );
           })

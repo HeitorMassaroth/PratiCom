@@ -8,7 +8,7 @@ export default function Header({ currentView, setCurrentView, theme, toggleTheme
     deliveries: { title: 'Controle de Encomendas', subtitle: 'Recebimento de pacotes, notificação e confirmação por PIN' },
     financial: { title: 'Gestão Financeira & Boletos', subtitle: 'Controle de fluxo de caixa, despesas e inadimplência por unidade' },
     access: { title: 'Portaria & Controle de Acessos', subtitle: 'Registro de entrada e saída de visitantes, prestadores e veículos' },
-    residents: { title: 'Cadastro de Pessoas & Unidades', subtitle: 'Diretório de moradores, apartamentos, veículos e animais de estimação' },
+    residents: { title: 'Cadastro de Pessoas & Unidades', subtitle: 'Diretório de moradores, apartamentos e veículos' },
     territory: { title: 'Condomínios & Blocos', subtitle: 'Estrutura territorial, blocos e associação segura de unidades' },
     reservations: { title: 'Reservas de Áreas Comuns', subtitle: 'Agendamento de churrasqueira, salão e quadra (Limite: 1 hora por pessoa/dia)' },
     announcements: { title: 'Mural de Comunicados', subtitle: 'Informativos, convocações de assembleia e avisos urgentes aos moradores' },

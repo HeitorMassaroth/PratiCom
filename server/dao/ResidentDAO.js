@@ -2,7 +2,7 @@ import DatabaseSingleton from '../config/DatabaseSingleton.js';
 
 /**
  * Padrão de Projeto: DAO (Data Access Object - 1/3)
- * Isolamento e abstração do acesso aos dados de Unidades, Moradores, Veículos e Pets no SQLite.
+ * Isolamento e abstração do acesso aos dados de Unidades, Moradores e Veículos no SQLite.
  */
 export class ResidentDAO {
   constructor() {
@@ -33,12 +33,10 @@ export class ResidentDAO {
     return units.map(u => {
       const resCount = this.db.prepare('SELECT COUNT(*) as count FROM residents WHERE unit_id = ?').get(u.id).count;
       const vehCount = this.db.prepare('SELECT COUNT(*) as count FROM vehicles WHERE unit_id = ?').get(u.id).count;
-      const petCount = this.db.prepare('SELECT COUNT(*) as count FROM pets WHERE unit_id = ?').get(u.id).count;
       return {
         ...u,
         residents_count: resCount,
-        vehicles_count: vehCount,
-        pets_count: petCount
+        vehicles_count: vehCount
       };
     });
   }
@@ -48,12 +46,10 @@ export class ResidentDAO {
     if (!unit) return null;
     const resCount = this.db.prepare('SELECT COUNT(*) as count FROM residents WHERE unit_id = ?').get(unit.id).count;
     const vehCount = this.db.prepare('SELECT COUNT(*) as count FROM vehicles WHERE unit_id = ?').get(unit.id).count;
-    const petCount = this.db.prepare('SELECT COUNT(*) as count FROM pets WHERE unit_id = ?').get(unit.id).count;
     return {
       ...unit,
       residents_count: resCount,
-      vehicles_count: vehCount,
-      pets_count: petCount
+      vehicles_count: vehCount
     };
   }
 
@@ -399,28 +395,5 @@ export class ResidentDAO {
     const stmt = this.db.prepare('DELETE FROM vehicles WHERE id = ?');
     const info = stmt.run(vId);
     return info.changes > 0;
-  }
-
-  getPets({ condominiumId } = {}) {
-    let sql = `
-      SELECT p.*, u.block, u.number as unit_number, r.name as resident_name
-      FROM pets p
-      LEFT JOIN units u ON p.unit_id = u.id
-      LEFT JOIN blocks b ON u.block_id = b.id
-      LEFT JOIN residents r ON p.resident_id = r.id
-      WHERE 1=1
-    `;
-    const params = [];
-    if (condominiumId) {
-      const cId = parseInt(condominiumId, 10);
-      if (cId === 1) {
-        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
-      } else {
-        sql += ' AND b.condominium_id = ?';
-        params.push(cId);
-      }
-    }
-    sql += ' ORDER BY p.id DESC';
-    return this.db.prepare(sql).all(params);
   }
 }

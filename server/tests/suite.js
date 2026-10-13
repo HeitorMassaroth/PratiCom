@@ -10,7 +10,6 @@ const endpoints = [
   '/api/units',
   '/api/residents',
   '/api/vehicles',
-  '/api/pets',
   '/api/spaces',
   '/api/reservations',
   '/api/financial/summary',

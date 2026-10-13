@@ -88,7 +88,7 @@ A arquitetura do backend segue rigorosamente padrões da Gang of Four (GoF) para
 ### 2.2 Padrão DATA ACCESS OBJECT (DAO - 8 DAOs Especializados)
 Todas as queries SQL e manipulações DML estão encapsuladas em classes DAO em [`server/dao/`](file:///c:/Users/Heitor/Praticom_Broken/server/dao/):
 * [`CondominiumDAO.js`](file:///c:/Users/Heitor/Praticom_Broken/server/dao/CondominiumDAO.js): Gestão de condomínios, blocos territoriais, associação de unidades legadas e ativação de módulos por tenant (`condominium_modules`).
-* [`ResidentDAO.js`](file:///c:/Users/Heitor/Praticom_Broken/server/dao/ResidentDAO.js): CRUD completo de unidades, moradores, veículos e animais de estimação (pets).
+* [`ResidentDAO.js`](file:///c:/Users/Heitor/Praticom_Broken/server/dao/ResidentDAO.js): CRUD completo de unidades, moradores e veículos.
 * [`DeliveryDAO.js`](file:///c:/Users/Heitor/Praticom_Broken/server/dao/DeliveryDAO.js): Recepção, controle e baixa de encomendas, com suporte a PIN de segurança.
 * [`FinancialDAO.js`](file:///c:/Users/Heitor/Praticom_Broken/server/dao/FinancialDAO.js): Extrato financeiro, cálculo dinâmico de receitas, despesas, saldo e taxa de inadimplência, quitação de transações.
 * [`MarketDAO.js`](file:///c:/Users/Heitor/Praticom_Broken/server/dao/MarketDAO.js): Catálogo de produtos, ajuste de estoque, transações ACID de checkout do PDV com inserção normalizada em `market_sale_items`.
@@ -112,7 +112,7 @@ Localizados em [`server/services/templates/`](file:///c:/Users/Heitor/Praticom_B
 
 ---
 
-## 3. Banco de Dados Relacional SQLite (17 Tabelas)
+## 3. Banco de Dados Relacional SQLite (16 Tabelas)
 
 O banco de dados relacional oficial do Praticom ERP é definido em [`server/schema.sql`](file:///c:/Users/Heitor/Praticom_Broken/server/schema.sql):
 
@@ -123,8 +123,7 @@ O banco de dados relacional oficial do Praticom ERP é definido em [`server/sche
 | 3 | `units` | `id` (AUTO) | `block_id -> blocks(id)` | `UNIQUE(block, number)` | Apartamentos e salas |
 | 4 | `residents` | `id` (AUTO) | `unit_id -> units(id)` ON DELETE CASCADE | — | Moradores associados a unidades |
 | 5 | `vehicles` | `id` (AUTO) | `unit_id -> units(id)`, `resident_id -> residents(id)` | ON DELETE CASCADE (unidade) / SET NULL (morador) | Veículos dos moradores |
-| 6 | `pets` | `id` (AUTO) | `unit_id -> units(id)`, `resident_id -> residents(id)` | ON DELETE CASCADE (unidade) / SET NULL (morador) | Animais de estimação |
-| 7 | `deliveries` | `id` (AUTO) | `unit_id -> units(id)`, `resident_id -> residents(id)` | `status`, `pickup_code` NOT NULL | Encomendas na portaria |
+| 6 | `deliveries` | `id` (AUTO) | `unit_id -> units(id)`, `resident_id -> residents(id)` | `status`, `pickup_code` NOT NULL | Encomendas na portaria |
 | 8 | `access_logs` | `id` (AUTO) | `destination_unit_id -> units(id)` | ON DELETE CASCADE | Fluxo de visitantes e prestadores |
 | 9 | `spaces` | `id` (AUTO) | `condominium_id -> condominiums(id)` | — | Churrasqueiras, salões de festas |
 | 10 | `reservations` | `id` (AUTO) | `space_id`, `unit_id`, `resident_id` | ON DELETE CASCADE | Agendamento de áreas comuns |
@@ -165,7 +164,7 @@ O Praticom ERP utiliza um modelo de **Multi-Tenancy Lógico com Chave Particiona
 
 ### 4.2 Filtragem Relacional nos DAOs
 * **Filtragem Direta:** Tabelas com chave direta `condominium_id` (`spaces`, `financial_transactions`, `announcements`, `market_products`, `blocks`, `condominium_modules`) executam `WHERE condominium_id = ?`.
-* **Filtragem Hierárquica:** Tabelas associadas a unidades físicas (`units`, `residents`, `vehicles`, `pets`, `deliveries`, `access_logs`) realizam `JOIN` com blocos:
+* **Filtragem Hierárquica:** Tabelas associadas a unidades físicas (`units`, `residents`, `vehicles`, `deliveries`, `access_logs`) realizam `JOIN` com blocos:
   ```sql
   SELECT u.* FROM units u
   LEFT JOIN blocks b ON u.block_id = b.id
@@ -208,7 +207,7 @@ O administrador do sistema pode configurar quais módulos de negócio estão con
 ```
 
 1. **3 Áreas Obrigatórias (Indispensáveis e Não-Desativáveis):**
-   * **Cadastro de Pessoas (`residents`):** Gestão de moradores, unidades, veículos e animais de estimação.
+   * **Cadastro de Pessoas (`residents`):** Gestão de moradores, unidades e veículos.
    * **Condomínios & Blocos (`territory`):** Gestão cadastral de condomínios, blocos e mapeamento territorial.
    * **Mural de Comunicados (`announcements`):** Avisos gerais e comunicação institucional com moradores.
 2. **6 Módulos Opcionais Ativáveis:**
@@ -243,7 +242,7 @@ O Praticom ERP implementa conceitos de Linha de Produtos de Software através de
 
 ---
 
-## 7. Catálogo Completo de Endpoints REST (34 Endpoints)
+## 7. Catálogo Completo de Endpoints REST (33 Endpoints)
 
 | Método | Rota | Middlewares / Proteções | Finalidade | DAO Responsável |
 |---|---|---|---|---|
@@ -286,7 +285,6 @@ O Praticom ERP implementa conceitos de Linha de Produtos de Software através de
 | `POST` | `/api/vehicles` | `tenantContext` | Cadastra veículo e vincula à unidade/morador | `ResidentDAO` |
 | `PATCH` | `/api/vehicles/:id` | `tenantContext` | Atualiza dados do veículo cadastrado | `ResidentDAO` |
 | `DELETE` | `/api/vehicles/:id` | `tenantContext` | Exclui somente o veículo (preserva unidade/morador) | `ResidentDAO` |
-| `GET` | `/api/pets` | `tenantContext` | Lista animais de estimação cadastrados | `ResidentDAO` |
 | `GET` | `/api/spaces` | `moduleGuard('reservations')` | Lista espaços comuns do condomínio | `ReservationDAO` |
 | `GET` | `/api/reservations` | `moduleGuard('reservations')` | Lista reservas agendadas por data/espaço | `ReservationDAO` |
 | `POST` | `/api/reservations` | `moduleGuard('reservations')` | Registra agendamento de espaço | `ReservationDAO` |

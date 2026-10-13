@@ -68,20 +68,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
     FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE SET NULL
 );
 
--- 4. Animais de Estimação (Pets)
-CREATE TABLE IF NOT EXISTS pets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    unit_id INTEGER NOT NULL,
-    resident_id INTEGER,
-    name TEXT NOT NULL,
-    species TEXT DEFAULT 'Cachorro',
-    breed TEXT,
-    size TEXT,
-    FOREIGN KEY (unit_id) REFERENCES units(id) ON DELETE CASCADE,
-    FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE SET NULL
-);
-
--- 5. Encomendas (Portaria)
+-- 4. Encomendas (Portaria)
 CREATE TABLE IF NOT EXISTS deliveries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     unit_id INTEGER NOT NULL,
