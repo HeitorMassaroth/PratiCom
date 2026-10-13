@@ -70,9 +70,11 @@ export default function App() {
     }
   };
 
+  const [activeCondo, setActiveCondo] = useState(null);
   const [condoRefreshKey, setCondoRefreshKey] = useState(Date.now());
 
-  const handleCondoChange = () => {
+  const handleCondoChange = (condo) => {
+    if (condo) setActiveCondo(condo);
     loadCondoModules();
     loadDashboardMetrics();
     setCondoRefreshKey(Date.now());
@@ -89,10 +91,12 @@ export default function App() {
       loadDashboardMetrics();
     };
     window.addEventListener('condo-modules-changed', onModulesChanged);
+    window.addEventListener('dashboard-refresh', loadDashboardMetrics);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('condo-modules-changed', onModulesChanged);
+      window.removeEventListener('dashboard-refresh', loadDashboardMetrics);
     };
   }, []);
 
@@ -127,6 +131,7 @@ export default function App() {
               data={dashboardData} 
               setCurrentView={setCurrentView}
               onRefresh={loadDashboardMetrics}
+              activeCondo={activeCondo}
             />
           )}
 

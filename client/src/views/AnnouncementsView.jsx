@@ -73,6 +73,7 @@ export default function AnnouncementsView({ showToast }) {
         expires_at: ''
       });
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao publicar comunicado.', 'danger');
     }
@@ -84,6 +85,7 @@ export default function AnnouncementsView({ showToast }) {
       await api.deleteAnnouncement(id);
       showToast('Comunicado excluído do mural.', 'info');
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao excluir comunicado.', 'danger');
     }

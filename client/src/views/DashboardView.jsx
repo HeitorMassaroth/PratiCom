@@ -15,12 +15,13 @@ import {
   ShoppingCart
 } from 'lucide-react';
 
-export default function DashboardView({ data, setCurrentView, onRefresh }) {
+export default function DashboardView({ data, setCurrentView, onRefresh, activeCondo }) {
   const metrics = data?.metrics || {};
   const recentAccess = data?.recentAccess || [];
   const recentDeliveries = data?.recentDeliveries || [];
   const urgentAnnouncements = data?.urgentAnnouncements || [];
   const upcomingReservations = data?.upcomingReservations || [];
+  const condoName = data?.condominium?.name || activeCondo?.name || 'Condomínio Ativo';
 
   return (
     <div>
@@ -29,7 +30,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
             <span className="badge badge-success"><Sparkles size={13} /> Sistema Ativo</span>
-            <span className="welcome-banner-condo">Condomínio Residencial Parque das Flores</span>
+            <span className="welcome-banner-condo">{condoName}</span>
           </div>
           <h2 className="welcome-banner-title">
             Bem-vindo(a) ao PratiCom!
@@ -68,10 +69,10 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
           <div className="metric-info">
             <h4>Saldo em Caixa</h4>
             <div className="value" style={{ color: 'var(--accent-mint-text)' }}>
-              R$ {(metrics.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {(metrics.balance ?? metrics.currentBalance ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <div className="subtext">
-              {metrics.overdueCount > 0 ? `${metrics.overdueCount} unidades em atraso` : 'Taxas em dia'}
+              {metrics.overdueCount > 0 ? `${metrics.overdueCount} unidade(s) em atraso` : 'Taxas em dia'}
             </div>
           </div>
         </div>
@@ -104,11 +105,15 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
           </div>
           <div className="metric-info">
             <h4>Estoque do Mercadinho</h4>
-            <div className="value" style={{ color: metrics.lowStockItems > 0 ? 'var(--accent-danger-text)' : 'inherit' }}>
-              {metrics.lowStockItems ?? 0}
+            <div className="value" style={{ color: (metrics.criticalStockItems || metrics.lowStockItems) > 0 ? 'var(--accent-danger-text)' : 'inherit' }}>
+              {metrics.criticalStockItems ?? metrics.lowStockItems ?? 0}
             </div>
             <div className="subtext">
-              {metrics.lowStockItems > 0 ? 'Itens abaixo do estoque mínimo' : 'Estoque abastecido'}
+              {metrics.outOfStockItems > 0 
+                ? `${metrics.outOfStockItems} em falta • ${metrics.lowStockOnlyItems || 0} abaixo do mín.` 
+                : metrics.lowStockItems > 0 
+                  ? `${metrics.lowStockItems} item(ns) abaixo do estoque mínimo` 
+                  : (metrics.totalMarketProducts > 0 ? `Estoque abastecido (${metrics.totalMarketProducts} itens)` : 'Estoque abastecido')}
             </div>
           </div>
         </div>
@@ -163,7 +168,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
                         <td>{log.block ? `${log.block} - Apto ${log.unit_number}` : 'Área Geral'}</td>
                         <td>{new Date(log.entered_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td>
                         <td>
-                          {log.status === 'inside' ? (
+                          {['inside', 'IN_PROPERTY'].includes(log.status) ? (
                             <span className="badge badge-warning">No Condomínio</span>
                           ) : (
                             <span className="badge badge-success">Saiu</span>
@@ -316,7 +321,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div className="badge badge-warning" style={{ fontSize: '0.75rem' }}>
-                        {res.reservation_date}
+                        {res.reservation_date ? res.reservation_date.split('-').reverse().join('/') : ''}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '2px' }}>
                         {res.start_time} às {res.end_time} (1h)

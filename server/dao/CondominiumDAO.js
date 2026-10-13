@@ -106,8 +106,12 @@ export class CondominiumDAO {
       throw new Error(`Já existe outro bloco chamado '${trimmedName}' neste condomínio.`);
     }
 
-    const result = this.db.prepare('UPDATE blocks SET name=?, description=? WHERE id=?').run(trimmedName, data.description || null, id(blockId));
-    if (!result.changes) throw new Error('Bloco não encontrado.');
+    const updateTx = this.db.transaction(() => {
+      const result = this.db.prepare('UPDATE blocks SET name=?, description=? WHERE id=?').run(trimmedName, data.description || null, id(blockId));
+      if (!result.changes) throw new Error('Bloco não encontrado.');
+      this.db.prepare('UPDATE units SET block=? WHERE block_id=?').run(trimmedName, id(blockId));
+    });
+    updateTx();
     return this.getBlock(blockId);
   }
 

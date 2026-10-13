@@ -93,31 +93,88 @@ app.get('/api/dashboard', checkModuleAvailability('dashboard'), async (req, res)
     const hasAccess = condominiumDAO.isModuleEnabled(condominiumId, 'access');
     const hasFinancial = condominiumDAO.isModuleEnabled(condominiumId, 'financial');
     const hasReservations = condominiumDAO.isModuleEnabled(condominiumId, 'reservations');
+    const hasMarket = condominiumDAO.isModuleEnabled(condominiumId, 'market');
 
+    // 1. Encomendas
     const deliveries = hasDeliveries ? deliveryDAO.getDeliveries({ condominiumId }) : [];
     const pendingDeliveries = deliveries.filter(d => ['pending', 'PENDING', 'RECEBIDA'].includes(d.status));
 
+    // 2. Portaria & Visitantes
     const accessLogs = hasAccess ? accessDAO.getAccessLogs({ condominiumId }) : [];
     const activeAccess = accessLogs.filter(a => a.status === 'IN_PROPERTY' || a.status === 'inside');
 
-    const summary = hasFinancial ? financialDAO.getSummary({ condominiumId }) : { default_amount: 0, default_rate: 0 };
+    // 3. Financeiro
+    const summary = hasFinancial ? financialDAO.getSummary({ condominiumId }) : { currentBalance: 0, overdueCount: 0, default_rate: 0, income: { overdue: 0 } };
+    const balance = hasFinancial ? (summary.currentBalance ?? 0) : null;
+    const overdueCount = hasFinancial ? (summary.overdueCount ?? 0) : null;
+    const overdueAmount = hasFinancial ? (summary.income?.overdue ?? 0) : null;
+    const defaultRate = hasFinancial ? (summary.default_rate ?? 0) : null;
 
-    const announcements = announcementDAO.getAnnouncements({ condominiumId });
-    const urgentAnnouncements = announcements.filter(a => a.priority === 'URGENTE' || a.priority === 'high');
+    // 4. Mercadinho & Estoque
+    const marketProducts = hasMarket ? marketDAO.getProducts({ condominiumId }) : [];
+    const totalMarketProducts = hasMarket ? marketProducts.length : null;
+    const outOfStockItems = hasMarket ? marketProducts.filter(p => (Number(p.stock_quantity) || 0) <= 0).length : null;
+    const lowStockOnlyItems = hasMarket ? marketProducts.filter(p => (Number(p.stock_quantity) || 0) > 0 && (Number(p.stock_quantity) || 0) <= (p.min_stock ?? 5)).length : null;
+    const criticalStockItems = hasMarket ? marketProducts.filter(p => (Number(p.stock_quantity) || 0) <= (p.min_stock ?? 5)).length : null;
 
+    // 5. Data local de hoje (YYYY-MM-DD)
+    const now = new Date();
+    const todayStr = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0')
+    ].join('-');
+
+    // 6. Reservas
     const reservations = hasReservations ? spaceDAO.getReservations({ condominiumId }) : [];
+    const todayReservationsList = reservations.filter(r => 
+      r.reservation_date === todayStr && 
+      ['CONFIRMED', 'Confirmada'].includes(r.status)
+    );
+    const todayReservationsCount = hasReservations ? todayReservationsList.length : null;
+
+    const futureReservations = reservations
+      .filter(r => r.reservation_date >= todayStr && ['CONFIRMED', 'Confirmada'].includes(r.status))
+      .sort((a, b) => a.reservation_date.localeCompare(b.reservation_date) || (a.start_time || '').localeCompare(b.start_time || ''));
+    const upcomingReservations = futureReservations.length > 0 
+      ? futureReservations 
+      : reservations.filter(r => ['CONFIRMED', 'Confirmada'].includes(r.status)).slice(0, 5);
+
+    // 7. Comunicados
+    const announcements = announcementDAO.getAnnouncements({ condominiumId });
+    const activeAnnouncements = announcements.filter(a => !a.expires_at || a.expires_at >= todayStr);
+    const urgentAnnouncements = activeAnnouncements.filter(a => 
+      a.is_pinned === 1 || 
+      ['URGENTE', 'URGENT', 'HIGH'].includes(String(a.priority || '').toUpperCase())
+    );
+
+    // 8. Condomínio Ativo
+    const activeCondo = condominiumDAO.getCondominium(condominiumId);
 
     const data = {
       metrics: {
         pendingDeliveries: hasDeliveries ? pendingDeliveries.length : null,
+        activeVisitors: hasAccess ? activeAccess.length : null,
         activeAccess: hasAccess ? activeAccess.length : null,
-        overdueAmount: hasFinancial ? (summary.default_amount || 0) : null,
-        defaultRate: hasFinancial ? (summary.default_rate || 0) : null
+        balance: balance,
+        currentBalance: balance,
+        overdueCount: overdueCount,
+        overdueAmount: overdueAmount,
+        defaultRate: defaultRate,
+        todayReservations: todayReservationsCount,
+        lowStockItems: criticalStockItems,
+        outOfStockItems: outOfStockItems,
+        lowStockOnlyItems: lowStockOnlyItems,
+        criticalStockItems: criticalStockItems,
+        totalMarketProducts: totalMarketProducts,
+        activeAnnouncements: activeAnnouncements.length,
+        urgentAnnouncementsCount: urgentAnnouncements.length
       },
+      condominium: activeCondo ? { id: activeCondo.id, name: activeCondo.name } : null,
       recentAccess: activeAccess.slice(0, 5),
       recentDeliveries: pendingDeliveries.slice(0, 5),
       urgentAnnouncements,
-      upcomingReservations: reservations.slice(0, 5)
+      upcomingReservations: upcomingReservations.slice(0, 5)
     };
 
     res.json(data);

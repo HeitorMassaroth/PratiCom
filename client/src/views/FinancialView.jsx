@@ -82,6 +82,7 @@ export default function FinancialView({ showToast }) {
         status: 'pending'
       });
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao registrar transação.', 'danger');
     }
@@ -92,6 +93,7 @@ export default function FinancialView({ showToast }) {
       await api.payFinancialTransaction(id);
       showToast('Pagamento confirmado e quitado com sucesso!', 'success');
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao registrar pagamento.', 'danger');
     }

@@ -110,6 +110,7 @@ export default function DeliveriesView({ showToast }) {
       }
       closeDeliveryModal();
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao salvar encomenda.', 'danger');
     }
@@ -121,6 +122,7 @@ export default function DeliveriesView({ showToast }) {
       await api.deleteDelivery(pkg.id);
       showToast('Encomenda excluída.', 'info');
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao excluir encomenda.', 'danger');
     }
@@ -140,6 +142,7 @@ export default function DeliveriesView({ showToast }) {
       setPickupPinInput('');
       setPickedUpByInput('');
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao confirmar retirada. Verifique o PIN.', 'danger');
     }

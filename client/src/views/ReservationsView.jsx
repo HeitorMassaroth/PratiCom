@@ -142,6 +142,7 @@ export default function ReservationsView({ showToast }) {
       setNotesInput('');
       setGuestsCount(0);
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao criar reserva.', 'danger');
     }
@@ -153,6 +154,7 @@ export default function ReservationsView({ showToast }) {
       await api.cancelReservation(id);
       showToast('Reserva cancelada com sucesso.', 'info');
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao cancelar reserva.', 'danger');
     }

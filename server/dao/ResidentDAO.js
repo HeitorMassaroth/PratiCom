@@ -11,7 +11,7 @@ export class ResidentDAO {
 
   getUnits({ condominiumId } = {}) {
     let sql = `
-      SELECT u.* 
+      SELECT u.id, u.block_id, COALESCE(b.name, u.block) as block, u.number, u.floor, u.type, b.condominium_id
       FROM units u
       LEFT JOIN blocks b ON u.block_id = b.id
       WHERE 1=1
@@ -28,7 +28,7 @@ export class ResidentDAO {
       }
     }
 
-    sql += ' ORDER BY u.block, u.number';
+    sql += ' ORDER BY COALESCE(b.name, u.block), u.number';
     const units = this.db.prepare(sql).all(params);
     return units.map(u => {
       const resCount = this.db.prepare('SELECT COUNT(*) as count FROM residents WHERE unit_id = ?').get(u.id).count;
@@ -44,7 +44,7 @@ export class ResidentDAO {
   }
 
   getUnit(id) {
-    const unit = this.db.prepare('SELECT u.*, b.condominium_id FROM units u LEFT JOIN blocks b ON u.block_id = b.id WHERE u.id = ?').get(parseInt(id, 10));
+    const unit = this.db.prepare('SELECT u.id, u.block_id, COALESCE(b.name, u.block) as block, u.number, u.floor, u.type, b.condominium_id FROM units u LEFT JOIN blocks b ON u.block_id = b.id WHERE u.id = ?').get(parseInt(id, 10));
     if (!unit) return null;
     const resCount = this.db.prepare('SELECT COUNT(*) as count FROM residents WHERE unit_id = ?').get(unit.id).count;
     const vehCount = this.db.prepare('SELECT COUNT(*) as count FROM vehicles WHERE unit_id = ?').get(unit.id).count;

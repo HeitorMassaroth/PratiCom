@@ -103,6 +103,7 @@ export default function MarketInventoryView({ showToast }) {
       await api.updateMarketStock(id, { delta });
       showToast('Estoque atualizado!', 'success');
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao ajustar estoque.', 'danger');
     }
@@ -158,6 +159,7 @@ export default function MarketInventoryView({ showToast }) {
       }
       closeProductModal();
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao salvar produto.', 'danger');
     }
@@ -170,6 +172,7 @@ export default function MarketInventoryView({ showToast }) {
       setCart(prev => prev.filter(item => item.product_id !== prod.id));
       showToast(`Produto ${prod.name} excluído.`, 'info');
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao excluir produto.', 'danger');
     }
@@ -236,6 +239,7 @@ export default function MarketInventoryView({ showToast }) {
       setSelectedResidentId('');
       setIsCheckoutModalOpen(false);
       loadData();
+      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao finalizar compra.', 'danger');
     }
