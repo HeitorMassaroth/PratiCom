@@ -192,7 +192,10 @@ CREATE TABLE IF NOT EXISTS market_products (
     name TEXT NOT NULL,
     category TEXT NOT NULL,
     price REAL NOT NULL,
+    cost_price REAL,
     stock_quantity INTEGER DEFAULT 0,
+    min_stock INTEGER DEFAULT 5,
+    image_url TEXT,
     barcode TEXT,
     FOREIGN KEY (condominium_id) REFERENCES condominiums(id) ON DELETE RESTRICT
 );

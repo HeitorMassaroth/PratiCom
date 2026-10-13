@@ -158,20 +158,46 @@ app.post('/api/deliveries', checkModuleAvailability('deliveries'), (req, res) =>
     if (!unit_id || !courier) {
       return res.status(400).json({ error: 'Unidade e transportadora são obrigatórios.' });
     }
-    const created = deliveryDAO.createDelivery(req.body, { condominiumId: req.condominiumId });
+    const created = deliveryDAO.createDelivery(req.body, req.condominiumId);
     res.status(201).json(created);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const status = /não encontrad|não pertence/i.test(err.message) ? 400 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/deliveries/:id', checkModuleAvailability('deliveries'), (req, res) => {
+  try {
+    const delivery = deliveryDAO.getDelivery(req.params.id, req.condominiumId);
+    if (!delivery) return res.status(404).json({ error: 'Encomenda não encontrada.' });
+    res.json(delivery);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
 app.patch('/api/deliveries/:id', checkModuleAvailability('deliveries'), (req, res) => {
   try {
-    const { id } = req.params;
-    const updated = deliveryDAO.updateDelivery(id, req.body, { condominiumId: req.condominiumId });
+    if (req.body.courier !== undefined && !req.body.courier) {
+      return res.status(400).json({ error: 'Transportadora é obrigatória.' });
+    }
+    const updated = deliveryDAO.updateDelivery(req.params.id, req.body, req.condominiumId);
     res.json(updated);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const status = /^Encomenda não encontrada/i.test(err.message) ? 404 : /já retirada/i.test(err.message) ? 409 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.delete('/api/deliveries/:id', checkModuleAvailability('deliveries'), (req, res) => {
+  try {
+    const deleted = deliveryDAO.deleteDelivery(req.params.id, req.condominiumId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Encomenda não encontrada.' });
+    }
+    res.json({ message: 'Encomenda excluída com sucesso.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -179,19 +205,16 @@ app.patch('/api/deliveries/:id/pickup', checkModuleAvailability('deliveries'), (
   try {
     const { id } = req.params;
     const { pickup_code, picked_up_by } = req.body;
-    
+
     // Respeita Feature Flag de Notificação Avançada com PIN (LPS)
     const isAdvanced = AppConfigSingleton.isFeatureEnabled('ENABLE_ADVANCED_DELIVERIES');
     const codeToVerify = isAdvanced ? pickup_code : null;
 
-    const updated = deliveryDAO.pickupDelivery(id, { 
-      pickup_code: codeToVerify, 
-      picked_up_by, 
-      condominiumId: req.condominiumId 
-    });
+    const updated = deliveryDAO.pickupDelivery(id, { pickup_code: codeToVerify, picked_up_by }, req.condominiumId);
     res.json(updated);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const status = /não encontrada/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -596,12 +619,47 @@ app.get('/api/market/products', checkModuleAvailability('market'), checkFeature(
 
 app.post('/api/market/products', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
-    const { name, price } = req.body;
+    const { name } = req.body;
+    const price = req.body.price ?? req.body.sale_price;
     if (!name || (!price && price !== 0)) {
       return res.status(400).json({ error: 'Nome e preço são obrigatórios.' });
     }
-    const created = marketDAO.createProduct({ condominium_id: req.condominiumId, ...req.body });
+    // O condomínio vem sempre do contexto da requisição, nunca do corpo enviado pela tela
+    const created = marketDAO.createProduct({ ...req.body, condominium_id: req.condominiumId });
     res.status(201).json(created);
+  } catch (err) {
+    const status = /inválid/i.test(err.message) ? 400 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.get('/api/market/products/:id', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
+  try {
+    const product = marketDAO.getProduct(req.params.id, req.condominiumId);
+    if (!product) return res.status(404).json({ error: 'Produto não encontrado.' });
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/market/products/:id', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
+  try {
+    const updated = marketDAO.updateProduct(req.params.id, req.body, req.condominiumId);
+    res.json(updated);
+  } catch (err) {
+    const status = /não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.delete('/api/market/products/:id', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
+  try {
+    const deleted = marketDAO.deleteProduct(req.params.id, req.condominiumId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Produto não encontrado.' });
+    }
+    res.json({ message: 'Produto excluído com sucesso.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -610,21 +668,23 @@ app.post('/api/market/products', checkModuleAvailability('market'), checkFeature
 app.patch('/api/market/products/:id/stock', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
     const { id } = req.params;
-    const { quantity, action } = req.body;
-    const updated = marketDAO.updateStock(id, { quantity, action });
+    const { delta, quantity, action } = req.body;
+    const updated = marketDAO.updateStock(id, { delta, quantity, action }, req.condominiumId);
     res.json(updated);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const status = /não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
   }
 });
 
 app.post('/api/market/checkout', checkModuleAvailability('market'), checkFeature('ENABLE_MARKETPLACE'), (req, res) => {
   try {
-    const { items, payment_method, unit_id, resident_id, total_amount } = req.body;
+    const { items, payment_method, unit_id, resident_id } = req.body;
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Carrinho de compras vazio.' });
     }
-    const result = marketDAO.checkout({ unit_id, resident_id, total_amount, payment_method, items });
+    // total_amount enviado pela tela é ignorado: o DAO calcula o total com os preços do banco
+    const result = marketDAO.checkout({ unit_id, resident_id, payment_method, items }, req.condominiumId);
     res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });

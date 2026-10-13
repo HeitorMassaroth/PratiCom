@@ -10,12 +10,20 @@ import {
   Filter,
   CheckCircle2,
   Clock,
-  Edit2,
-  Trash2,
-  Ban,
-  AlertTriangle
+  Building,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
+
+const EMPTY_DELIVERY = {
+  unit_id: '',
+  resident_id: '',
+  courier: 'Mercado Livre',
+  tracking_code: '',
+  description: '',
+  notes: ''
+};
 
 export default function DeliveriesView({ showToast }) {
   const [deliveries, setDeliveries] = useState([]);
@@ -37,16 +45,11 @@ export default function DeliveriesView({ showToast }) {
   const [pickedUpByInput, setPickedUpByInput] = useState('');
   const [cancelReasonInput, setCancelReasonInput] = useState('');
 
-  // Form de nova encomenda
-  const [formData, setFormData] = useState({
-    unit_id: '',
-    resident_id: '',
-    courier: 'Mercado Livre',
-    tracking_code: '',
-    description: '',
-    notes: '',
-    received_by: 'Portaria'
-  });
+  // null = criando, objeto = editando
+  const [editingDelivery, setEditingDelivery] = useState(null);
+
+  // Form de encomenda
+  const [formData, setFormData] = useState(EMPTY_DELIVERY);
 
   // Form de edição
   const [editFormData, setEditFormData] = useState({
@@ -86,20 +89,60 @@ export default function DeliveriesView({ showToast }) {
     loadData();
   }, [statusFilter]);
 
-  const handleCreate = async (e) => {
+  const openCreateModal = () => {
+    setEditingDelivery(null);
+    setFormData(EMPTY_DELIVERY);
+    setIsNewModalOpen(true);
+  };
+
+  const openEditModal = (pkg) => {
+    setEditingDelivery(pkg);
+    setFormData({
+      unit_id: String(pkg.unit_id),
+      resident_id: pkg.resident_id ? String(pkg.resident_id) : '',
+      courier: pkg.courier || 'Mercado Livre',
+      tracking_code: pkg.tracking_code || '',
+      description: pkg.description || '',
+      notes: pkg.notes || ''
+    });
+    setIsNewModalOpen(true);
+  };
+
+  const closeDeliveryModal = () => {
+    setIsNewModalOpen(false);
+    setEditingDelivery(null);
+    setFormData(EMPTY_DELIVERY);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.unit_id || !formData.courier) {
       showToast('Preencha os campos obrigatórios.', 'warning');
       return;
     }
     try {
-      const created = await api.createDelivery(formData);
-      showToast(`Encomenda cadastrada! PIN de retirada gerado: ${created.pickup_code}`, 'success');
-      setIsNewModalOpen(false);
-      setFormData({ unit_id: '', resident_id: '', courier: 'Mercado Livre', tracking_code: '', description: '', notes: '', received_by: 'Portaria' });
+      if (editingDelivery) {
+        await api.updateDelivery(editingDelivery.id, formData);
+        showToast('Encomenda atualizada com sucesso!', 'success');
+      } else {
+        const created = await api.createDelivery(formData);
+        showToast(`Encomenda cadastrada! PIN de retirada gerado: ${created.pickup_code}`, 'success');
+      }
+      closeDeliveryModal();
       loadData();
     } catch (err) {
-      showToast(err.message || 'Erro ao registrar encomenda.', 'danger');
+      showToast(err.message || 'Erro ao salvar encomenda.', 'danger');
+    }
+  };
+
+  const handleDelete = async (pkg) => {
+    if (!window.confirm(`Deseja realmente excluir a encomenda ${pkg.courier} do ${pkg.block} - Apto ${pkg.unit_number}?`)) return;
+    try {
+      await api.deleteDelivery(pkg.id);
+      showToast('Encomenda excluída.', 'info');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao excluir encomenda.', 'danger');
     }
   };
 
@@ -243,7 +286,7 @@ export default function DeliveriesView({ showToast }) {
           </select>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
+        <button className="btn btn-primary" onClick={openCreateModal}>
           <Plus size={18} /> Registrar Recebimento de Pacote
         </button>
       </div>
@@ -301,109 +344,92 @@ export default function DeliveriesView({ showToast }) {
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
                           {new Date(pkg.received_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </div>
-                      </td>
-                      <td>
-                        <div style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: 'rgba(59, 130, 246, 0.12)',
-                          border: '1px solid rgba(59, 130, 246, 0.3)',
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          fontFamily: 'monospace',
-                          fontWeight: '700',
-                          color: '#60a5fa'
-                        }}>
-                          <Key size={14} /> {pkg.pickup_code}
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '0.85rem' }}>{new Date(pkg.received_at).toLocaleDateString('pt-BR')}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                        {new Date(pkg.received_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'rgba(59, 130, 246, 0.12)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontFamily: 'monospace',
+                        fontWeight: '700',
+                        color: '#60a5fa'
+                      }}>
+                        <Key size={14} /> {pkg.pickup_code}
+                      </div>
+                    </td>
+                    <td>
+                      {pkg.status === 'pending' ? (
+                        <span className="badge badge-warning">
+                          <Clock size={12} /> Aguardando Retirada
+                        </span>
+                      ) : (
+                        <span className="badge badge-success">
+                          <CheckCircle2 size={12} /> Retirado em {new Date(pkg.picked_up_at).toLocaleDateString('pt-BR')}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {pkg.status === 'pending' ? (
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button 
+                            className="btn btn-secondary btn-sm"
+                            title="Simular Notificação WhatsApp"
+                            onClick={() => showToast(`Notificação enviada ao morador da unidade ${pkg.block} - ${pkg.unit_number} com PIN: ${pkg.pickup_code}`, 'info')}
+                          >
+                            <Send size={14} /> Notificar
+                          </button>
+                          <button 
+                            className="btn btn-success btn-sm"
+                            onClick={() => {
+                              setSelectedDelivery(pkg);
+                              setIsPickupModalOpen(true);
+                            }}
+                          >
+                            <CheckCircle size={14} /> Dar Baixa
+                          </button>
+                          <button
+                            style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: '4px' }}
+                            title="Editar encomenda"
+                            onClick={() => openEditModal(pkg)}
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px' }}
+                            title="Excluir encomenda"
+                            onClick={() => handleDelete(pkg)}
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
-                      </td>
-                      <td>
-                        {pending ? (
-                          <span className="badge badge-warning">
-                            <Clock size={12} /> Aguardando Retirada
+                      ) : (
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+                            Por: {pkg.picked_up_by || 'Morador'}
                           </span>
-                        ) : cancelled ? (
-                          <span className="badge badge-secondary" style={{ opacity: 0.85 }}>
-                            <Ban size={12} /> Cancelada
-                          </span>
-                        ) : (
-                          <span className="badge badge-success">
-                            <CheckCircle2 size={12} /> Retirado em {pkg.picked_up_at ? new Date(pkg.picked_up_at).toLocaleDateString('pt-BR') : 'Data n/d'}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {pending ? (
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <button 
-                              className="btn btn-secondary btn-sm"
-                              title="Simular Notificação WhatsApp"
-                              onClick={() => showToast(`Notificação enviada ao morador da unidade ${pkg.block} - ${pkg.unit_number} com PIN: ${pkg.pickup_code}`, 'info')}
-                            >
-                              <Send size={14} /> Notificar
-                            </button>
-                            <button 
-                              className="btn btn-success btn-sm"
-                              title="Dar Baixa / Entregar"
-                              onClick={() => {
-                                setSelectedDelivery(pkg);
-                                setIsPickupModalOpen(true);
-                              }}
-                            >
-                              <CheckCircle size={14} /> Dar Baixa
-                            </button>
-                            <button 
-                              className="btn btn-secondary btn-sm"
-                              title="Editar Informações"
-                              onClick={() => openEditModal(pkg)}
-                            >
-                              <Edit2 size={14} />
-                            </button>
-                            <button 
-                              className="btn btn-secondary btn-sm"
-                              title="Cancelar Encomenda"
-                              style={{ color: 'var(--accent-danger)' }}
-                              onClick={() => openCancelModal(pkg)}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        ) : cancelled ? (
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={pkg.cancellation_reason}>
-                              Motivo: {pkg.cancellation_reason || 'Cancelado'}
-                            </span>
-                            <button 
-                              className="btn btn-secondary btn-sm"
-                              title="Excluir do Banco de Dados"
-                              style={{ color: 'var(--accent-danger)' }}
-                              onClick={() => {
-                                setSelectedDelivery(pkg);
-                                handleDelete();
-                              }}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                              Por: {pkg.picked_up_by || 'Morador'}
-                            </span>
-                            <button 
-                              className="btn btn-secondary btn-sm"
-                              title="Editar Observações"
-                              onClick={() => openEditModal(pkg)}
-                            >
-                              <Edit2 size={13} />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
+                          <button
+                            style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px' }}
+                            title="Excluir encomenda"
+                            onClick={() => handleDelete(pkg)}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -416,13 +442,16 @@ export default function DeliveriesView({ showToast }) {
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Package size={20} color="var(--accent-primary)" /> Registrar Encomenda
+                {editingDelivery
+                  ? <><Pencil size={20} color="var(--accent-primary)" /> Editar Encomenda</>
+                  : <><Package size={20} color="var(--accent-primary)" /> Registrar Encomenda</>
+                }
               </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsNewModalOpen(false)}>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeDeliveryModal}>
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div className="form-group">
                   <label>Unidade de Destino *</label>
@@ -510,11 +539,11 @@ export default function DeliveriesView({ showToast }) {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsNewModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeDeliveryModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Registrar e Gerar PIN
+                  {editingDelivery ? 'Salvar Alterações' : 'Registrar e Gerar PIN'}
                 </button>
               </div>
             </form>

@@ -68,6 +68,7 @@ export const api = {
   },
   createDelivery: (data) => request('/deliveries', { method: 'POST', body: JSON.stringify(data) }),
   updateDelivery: (id, data) => request(`/deliveries/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteDelivery: (id) => request(`/deliveries/${id}`, { method: 'DELETE' }),
   pickupDelivery: (id, data) => request(`/deliveries/${id}/pickup`, { method: 'PATCH', body: JSON.stringify(data) }),
   cancelDelivery: (id, data) => request(`/deliveries/${id}/cancel`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteDelivery: (id) => request(`/deliveries/${id}`, { method: 'DELETE' }),
@@ -133,6 +134,8 @@ export const api = {
     return request(`/market/products${qs ? '?' + qs : ''}`);
   },
   createMarketProduct: (data) => request('/market/products', { method: 'POST', body: JSON.stringify(data) }),
+  updateMarketProduct: (id, data) => request(`/market/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteMarketProduct: (id) => request(`/market/products/${id}`, { method: 'DELETE' }),
   updateMarketStock: (id, data) => request(`/market/products/${id}/stock`, { method: 'PATCH', body: JSON.stringify(data) }),
   checkoutMarket: (data) => request('/market/checkout', { method: 'POST', body: JSON.stringify(data) }),
   getMarketSales: () => request('/market/sales'),

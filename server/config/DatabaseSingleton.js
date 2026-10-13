@@ -65,6 +65,18 @@ class DatabaseSingleton {
     addColumnIfMissing('deliveries', 'cancelled_at DATETIME');
     addColumnIfMissing('deliveries', 'cancelled_by TEXT');
     addColumnIfMissing('deliveries', 'cancellation_reason TEXT');
+    addColumnIfMissing('market_products', 'cost_price REAL');
+    addColumnIfMissing('market_products', 'min_stock INTEGER DEFAULT 5');
+    addColumnIfMissing('market_products', 'image_url TEXT');
+
+    // Padroniza status de encomendas gravados em maiúsculas por versões anteriores do DAO.
+    const deliveriesExists = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'deliveries'").get();
+    if (deliveriesExists) {
+      this.db.exec(`
+        UPDATE deliveries SET status = 'pending' WHERE status = 'PENDING';
+        UPDATE deliveries SET status = 'delivered' WHERE status = 'PICKED_UP';
+      `);
+    }
 
     // Módulos ativáveis por condomínio
     this.db.exec(`
