@@ -92,7 +92,10 @@ export const api = {
   updateResident: (id, data) => request(`/residents/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteResident: (id) => request(`/residents/${id}`, { method: 'DELETE' }),
   getVehicles: () => request('/vehicles'),
+  getVehicle: (id) => request(`/vehicles/${id}`),
   createVehicle: (data) => request('/vehicles', { method: 'POST', body: JSON.stringify(data) }),
+  updateVehicle: (id, data) => request(`/vehicles/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteVehicle: (id) => request(`/vehicles/${id}`, { method: 'DELETE' }),
   getPets: () => request('/pets'),
 
   // Reservas

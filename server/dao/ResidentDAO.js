@@ -274,21 +274,115 @@ export class ResidentDAO {
     return this.db.prepare(sql).all(params);
   }
 
-  createVehicle(data) {
+  getVehicle(id, condominiumId) {
+    let sql = `
+      SELECT v.*, u.block, u.number as unit_number, r.name as resident_name, b.condominium_id
+      FROM vehicles v
+      LEFT JOIN units u ON v.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
+      LEFT JOIN residents r ON v.resident_id = r.id
+      WHERE v.id = ?
+    `;
+    const params = [parseInt(id, 10)];
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
+    return this.db.prepare(sql).get(...params) || null;
+  }
+
+  createVehicle(data, condominiumId) {
+    if (!data.plate || !String(data.plate).trim()) {
+      throw new Error('Placa do veículo é obrigatória.');
+    }
+    if (!data.model || !String(data.model).trim()) {
+      throw new Error('Modelo/marca do veículo é obrigatório.');
+    }
+    const unitId = parseInt(data.unit_id, 10);
+    if (!unitId) {
+      throw new Error('Unidade é obrigatória.');
+    }
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      const unitCheck = this.db.prepare(`
+        SELECT u.id FROM units u
+        LEFT JOIN blocks b ON u.block_id = b.id
+        WHERE u.id = ? ${cId === 1 ? 'AND (b.condominium_id = 1 OR u.block_id IS NULL)' : 'AND b.condominium_id = ?'}
+      `).get(...(cId === 1 ? [unitId] : [unitId, cId]));
+      if (!unitCheck) {
+        throw new Error('A unidade informada não pertence a este condomínio.');
+      }
+    }
+
     const stmt = this.db.prepare(`
       INSERT INTO vehicles (unit_id, resident_id, plate, model, color, type, parking_spot)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     const info = stmt.run(
-      parseInt(data.unit_id, 10),
+      unitId,
       data.resident_id ? parseInt(data.resident_id, 10) : null,
-      data.plate.toUpperCase(),
-      data.model,
-      data.color || '',
+      String(data.plate).trim().toUpperCase(),
+      String(data.model).trim(),
+      data.color ? String(data.color).trim() : '',
       data.type || 'Carro',
-      data.parking_spot || ''
+      data.parking_spot ? String(data.parking_spot).trim() : ''
     );
-    return this.db.prepare('SELECT * FROM vehicles WHERE id = ?').get(info.lastInsertRowid);
+    return this.getVehicle(info.lastInsertRowid, condominiumId);
+  }
+
+  updateVehicle(id, data, condominiumId) {
+    const vId = parseInt(id, 10);
+    const existing = this.getVehicle(vId, condominiumId);
+    if (!existing) {
+      throw new Error('Veículo não encontrado ou não pertence a este condomínio.');
+    }
+
+    const unitId = data.unit_id ? parseInt(data.unit_id, 10) : existing.unit_id;
+    if (condominiumId && data.unit_id) {
+      const cId = parseInt(condominiumId, 10);
+      const unitCheck = this.db.prepare(`
+        SELECT u.id FROM units u
+        LEFT JOIN blocks b ON u.block_id = b.id
+        WHERE u.id = ? ${cId === 1 ? 'AND (b.condominium_id = 1 OR u.block_id IS NULL)' : 'AND b.condominium_id = ?'}
+      `).get(...(cId === 1 ? [unitId] : [unitId, cId]));
+      if (!unitCheck) {
+        throw new Error('A nova unidade informada não pertence a este condomínio.');
+      }
+    }
+
+    this.db.prepare(`
+      UPDATE vehicles
+      SET unit_id = ?, resident_id = ?, plate = ?, model = ?, color = ?, type = ?, parking_spot = ?
+      WHERE id = ?
+    `).run(
+      unitId,
+      data.resident_id !== undefined ? (data.resident_id ? parseInt(data.resident_id, 10) : null) : existing.resident_id,
+      data.plate ? String(data.plate).trim().toUpperCase() : existing.plate,
+      data.model ? String(data.model).trim() : existing.model,
+      data.color !== undefined ? String(data.color).trim() : existing.color,
+      data.type || existing.type,
+      data.parking_spot !== undefined ? String(data.parking_spot).trim() : existing.parking_spot,
+      vId
+    );
+
+    return this.getVehicle(vId, condominiumId);
+  }
+
+  deleteVehicle(id, condominiumId) {
+    const vId = parseInt(id, 10);
+    const existing = this.getVehicle(vId, condominiumId);
+    if (!existing) {
+      throw new Error('Veículo não encontrado ou não pertence a este condomínio.');
+    }
+    const stmt = this.db.prepare('DELETE FROM vehicles WHERE id = ?');
+    const info = stmt.run(vId);
+    return info.changes > 0;
   }
 
   getPets({ condominiumId } = {}) {
