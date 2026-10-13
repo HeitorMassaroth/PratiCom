@@ -25,11 +25,13 @@ class DatabaseSingleton {
     // Compatibiliza bancos existentes antes de criar índices do schema novo.
     this.applyCompatibilityMigrations();
 
-    // Executa schema DDL se o banco foi criado
+    // Cria tabelas ausentes depois de aplicar compatibilidade ao banco legado.
     if (fs.existsSync(schemaPath)) {
       const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
       this.db.exec(schemaSql);
     }
+
+    this.seedCondominiumModules();
 
     DatabaseSingleton.instance = this;
   }
@@ -78,7 +80,10 @@ class DatabaseSingleton {
       ON condominium_modules(condominium_id, module_key, enabled);
     `);
 
-    // Seed de retrocompatibilidade para condomínios existentes sem módulos
+  }
+
+  seedCondominiumModules() {
+    // O schema cria e popula condominiums; só então é seguro semear seus módulos.
     const condos = this.db.prepare("SELECT id FROM condominiums").all();
     const defaultModules = ['dashboard', 'access', 'deliveries', 'reservations', 'financial', 'market'];
     const insertModule = this.db.prepare(`
