@@ -333,10 +333,40 @@ app.post('/api/vehicles', (req, res) => {
     if (!unit_id || !plate || !model) {
       return res.status(400).json({ error: 'Unidade, placa e modelo do veículo são obrigatórios.' });
     }
-    const created = residentDAO.createVehicle(req.body);
+    const created = residentDAO.createVehicle(req.body, req.condominiumId);
     res.status(201).json(created);
   } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/vehicles/:id', (req, res) => {
+  try {
+    const vehicle = residentDAO.getVehicle(req.params.id, req.condominiumId);
+    if (!vehicle) return res.status(404).json({ error: 'Veículo não encontrado.' });
+    res.json(vehicle);
+  } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/vehicles/:id', (req, res) => {
+  try {
+    const updated = residentDAO.updateVehicle(req.params.id, req.body, req.condominiumId);
+    res.json(updated);
+  } catch (err) {
+    const status = /não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.delete('/api/vehicles/:id', (req, res) => {
+  try {
+    residentDAO.deleteVehicle(req.params.id, req.condominiumId);
+    res.json({ message: 'Veículo removido com sucesso.' });
+  } catch (err) {
+    const status = /não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
   }
 });
 

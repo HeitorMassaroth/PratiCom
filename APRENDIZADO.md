@@ -281,8 +281,11 @@ O Praticom ERP implementa conceitos de Linha de Produtos de Software através de
 | `POST` | `/api/residents` | `tenantContext` | Cadastra novo morador | `ResidentDAO` |
 | `PATCH` | `/api/residents/:id` | `tenantContext` | Atualiza morador existente | `ResidentDAO` |
 | `DELETE` | `/api/residents/:id` | `tenantContext` | Remove cadastro de morador | `ResidentDAO` |
-| `GET` | `/api/vehicles` | `tenantContext` | Lista veículos cadastrados | `ResidentDAO` |
-| `POST` | `/api/vehicles` | `tenantContext` | Cadastra veículo e vincula à unidade | `ResidentDAO` |
+| `GET` | `/api/vehicles` | `tenantContext` | Lista veículos cadastrados no condomínio | `ResidentDAO` |
+| `GET` | `/api/vehicles/:id` | `tenantContext` | Detalhes de um veículo específico | `ResidentDAO` |
+| `POST` | `/api/vehicles` | `tenantContext` | Cadastra veículo e vincula à unidade/morador | `ResidentDAO` |
+| `PATCH` | `/api/vehicles/:id` | `tenantContext` | Atualiza dados do veículo cadastrado | `ResidentDAO` |
+| `DELETE` | `/api/vehicles/:id` | `tenantContext` | Exclui somente o veículo (preserva unidade/morador) | `ResidentDAO` |
 | `GET` | `/api/pets` | `tenantContext` | Lista animais de estimação cadastrados | `ResidentDAO` |
 | `GET` | `/api/spaces` | `moduleGuard('reservations')` | Lista espaços comuns do condomínio | `ReservationDAO` |
 | `GET` | `/api/reservations` | `moduleGuard('reservations')` | Lista reservas agendadas por data/espaço | `ReservationDAO` |

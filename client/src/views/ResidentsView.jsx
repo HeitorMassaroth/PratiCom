@@ -38,6 +38,7 @@ const EMPTY_VEHICLE = {
 };
 
 export default function ResidentsView({ showToast }) {
+  const [activeTab, setActiveTab] = useState('residents'); // 'residents' | 'vehicles'
   const [units, setUnits] = useState([]);
   const [residents, setResidents] = useState([]);
   const [vehicles, setVehicles] = useState([]);
@@ -52,6 +53,7 @@ export default function ResidentsView({ showToast }) {
 
   // null = criando, objeto = editando
   const [editingResident, setEditingResident] = useState(null);
+  const [editingVehicle, setEditingVehicle] = useState(null);
 
   // Form morador
   const [residentForm, setResidentForm] = useState(EMPTY_RESIDENT);
@@ -146,25 +148,104 @@ export default function ResidentsView({ showToast }) {
     }
   };
 
-  const handleCreateVehicle = async (e) => {
+  const openCreateVehicleModal = () => {
+    setEditingVehicle(null);
+    setVehicleForm(EMPTY_VEHICLE);
+    setIsVehicleModalOpen(true);
+  };
+
+  const openEditVehicleModal = (veh) => {
+    setEditingVehicle(veh);
+    setVehicleForm({
+      unit_id: String(veh.unit_id || ''),
+      resident_id: veh.resident_id ? String(veh.resident_id) : '',
+      plate: veh.plate || '',
+      model: veh.model || '',
+      color: veh.color || '',
+      type: veh.type || 'Carro',
+      parking_spot: veh.parking_spot || ''
+    });
+    setIsVehicleModalOpen(true);
+  };
+
+  const closeVehicleModal = () => {
+    setIsVehicleModalOpen(false);
+    setEditingVehicle(null);
+    setVehicleForm(EMPTY_VEHICLE);
+  };
+
+  const handleSubmitVehicle = async (e) => {
     e.preventDefault();
     if (!vehicleForm.unit_id || !vehicleForm.plate || !vehicleForm.model) {
-      showToast('Preencha os campos obrigatórios do veículo.', 'warning');
+      showToast('Preencha os campos obrigatórios do veículo (Unidade, Placa e Modelo).', 'warning');
       return;
     }
     try {
-      await api.createVehicle(vehicleForm);
-      showToast('Veículo cadastrado com sucesso!', 'success');
-      setIsVehicleModalOpen(false);
-      setVehicleForm(EMPTY_VEHICLE);
+      if (editingVehicle) {
+        await api.updateVehicle(editingVehicle.id, vehicleForm);
+        showToast(`Veículo ${vehicleForm.plate} atualizado com sucesso!`, 'success');
+      } else {
+        await api.createVehicle(vehicleForm);
+        showToast('Veículo cadastrado com sucesso!', 'success');
+      }
+      closeVehicleModal();
       loadData();
     } catch (err) {
-      showToast(err.message || 'Erro ao cadastrar veículo.', 'danger');
+      showToast(err.message || 'Erro ao salvar veículo.', 'danger');
     }
   };
 
+  const handleDeleteVehicle = async (vehicle) => {
+    const confirmMsg = `Deseja realmente excluir o veículo "${vehicle.model}" (Placa: ${vehicle.plate})? Esta ação não afetará o morador ou apartamento.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await api.deleteVehicle(vehicle.id);
+      showToast(`Veículo ${vehicle.plate} excluído com sucesso.`, 'info');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao excluir veículo.', 'danger');
+    }
+  };
+
+  const filteredVehicles = vehicles.filter((v) => {
+    if (selectedUnitId && String(v.unit_id) !== String(selectedUnitId)) return false;
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      (v.plate && v.plate.toLowerCase().includes(term)) ||
+      (v.model && v.model.toLowerCase().includes(term)) ||
+      (v.color && v.color.toLowerCase().includes(term)) ||
+      (v.resident_name && v.resident_name.toLowerCase().includes(term)) ||
+      (v.unit_number && String(v.unit_number).toLowerCase().includes(term)) ||
+      (v.block && v.block.toLowerCase().includes(term))
+    );
+  });
+
+  const unitResidentsForVehicle = vehicleForm.unit_id
+    ? residents.filter(r => String(r.unit_id) === String(vehicleForm.unit_id))
+    : [];
+
   return (
     <div>
+      {/* Abas Superiores de Navegação */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <button
+          className={`btn ${activeTab === 'residents' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('residents')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: activeTab === 'residents' ? '600' : 'normal' }}
+        >
+          <Users size={18} /> Moradores ({residents.length})
+        </button>
+        <button
+          className={`btn ${activeTab === 'vehicles' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('vehicles')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', fontWeight: activeTab === 'vehicles' ? '600' : 'normal' }}
+        >
+          <Car size={18} /> Ver Veículos ({vehicles.length})
+        </button>
+      </div>
+
       {/* Barra de Ações Superior */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -173,7 +254,7 @@ export default function ResidentsView({ showToast }) {
               <Search size={16} />
               <input
                 type="text"
-                placeholder="Buscar por morador, CPF, telefone..."
+                placeholder={activeTab === 'residents' ? "Buscar por morador, CPF, telefone..." : "Buscar por placa, modelo, morador..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -194,9 +275,19 @@ export default function ResidentsView({ showToast }) {
           </select>
         </div>
 
+        {/* Botões lado a lado conforme solicitado */}
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-secondary" onClick={() => setIsVehicleModalOpen(true)}>
-            <Car size={16} /> Cadastrar Veículo
+          {activeTab === 'residents' ? (
+            <button className="btn btn-secondary" onClick={() => setActiveTab('vehicles')}>
+              <Car size={16} /> Ver Veículos
+            </button>
+          ) : (
+            <button className="btn btn-secondary" onClick={() => setActiveTab('residents')}>
+              <Users size={16} /> Ver Moradores
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={openCreateVehicleModal}>
+            <Plus size={16} /> Cadastrar Veículo
           </button>
           <button className="btn btn-primary" onClick={openCreateModal}>
             <UserPlus size={16} /> Novo Morador
@@ -204,8 +295,120 @@ export default function ResidentsView({ showToast }) {
         </div>
       </div>
 
-      {/* Grid de Moradores Cadastrados */}
-      <div style={{
+      {/* Visualização: Tabela de Veículos ou Grid de Moradores */}
+      {activeTab === 'vehicles' ? (
+        <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>Carregando veículos cadastrados...</div>
+          ) : filteredVehicles.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)' }}>
+              <Car size={40} style={{ opacity: 0.4, marginBottom: '12px' }} />
+              <h4 style={{ color: 'var(--text-main)', marginBottom: '6px' }}>Nenhum veículo cadastrado</h4>
+              <p style={{ fontSize: '0.9rem', marginBottom: '16px' }}>
+                {searchTerm || selectedUnitId
+                  ? 'Nenhum veículo encontrado para os filtros selecionados.'
+                  : 'Nenhum veículo foi associado às unidades deste condomínio até o momento.'}
+              </p>
+              <button className="btn btn-primary" onClick={openCreateVehicleModal}>
+                <Plus size={16} /> Cadastrar Primeiro Veículo
+              </button>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th>Veículo (Marca / Modelo)</th>
+                    <th>Placa</th>
+                    <th>Cor</th>
+                    <th>Pessoa Responsável</th>
+                    <th>Apartamento</th>
+                    <th>Bloco</th>
+                    <th style={{ textAlign: 'right' }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredVehicles.map((veh) => (
+                    <tr key={veh.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--accent-primary)'
+                          }}>
+                            <Car size={16} />
+                          </div>
+                          <div>
+                            <strong style={{ color: 'var(--text-main)', display: 'block' }}>{veh.model}</strong>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{veh.type || 'Carro'}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="badge badge-info" style={{ fontWeight: '700', letterSpacing: '0.5px' }}>
+                          {veh.plate}
+                        </span>
+                      </td>
+                      <td>
+                        {veh.color || <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+                      <td>
+                        {veh.resident_name ? (
+                          <span style={{ fontWeight: '500', color: 'var(--text-main)' }}>{veh.resident_name}</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem' }}>Não associada</span>
+                        )}
+                      </td>
+                      <td>
+                        {veh.unit_number ? (
+                          <span className="badge badge-secondary">Apto {veh.unit_number}</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        {veh.block ? (
+                          <span>{veh.block}</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            title="Editar informações do veículo"
+                            onClick={() => openEditVehicleModal(veh)}
+                          >
+                            <Pencil size={14} /> Editar
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 12px', fontSize: '0.85rem', color: 'var(--danger, #ef4444)', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            title="Excluir este veículo"
+                            onClick={() => handleDeleteVehicle(veh)}
+                          >
+                            <Trash2 size={14} /> Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Grid de Moradores Cadastrados */
+        <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
         gap: '20px'
@@ -299,6 +502,7 @@ export default function ResidentsView({ showToast }) {
           })
         )}
       </div>
+      )}
 
       {/* Modal: Criar / Editar Morador */}
       {isResidentModalOpen && (
@@ -423,35 +627,67 @@ export default function ResidentsView({ showToast }) {
       )}
 
       {/* Modal: Novo Veículo */}
+      {/* Modal: Cadastrar / Editar Veículo */}
       {isVehicleModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Car size={20} color="var(--accent-purple)" /> Cadastrar Veículo
+                {editingVehicle
+                  ? <><Pencil size={20} color="var(--accent-purple)" /> Editar Veículo</>
+                  : <><Car size={20} color="var(--accent-purple)" /> Cadastrar Veículo</>
+                }
               </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsVehicleModalOpen(false)}>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeVehicleModal}>
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreateVehicle}>
+            <form onSubmit={handleSubmitVehicle}>
               <div className="modal-body">
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Unidade *</label>
+                    <label>Unidade (Apartamento) *</label>
                     <select
                       className="form-control"
                       required
                       value={vehicleForm.unit_id}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, unit_id: e.target.value })}
+                      onChange={(e) => {
+                        const newUnitId = e.target.value;
+                        setVehicleForm({
+                          ...vehicleForm,
+                          unit_id: newUnitId,
+                          resident_id: '' // reseta morador ao trocar de unidade
+                        });
+                      }}
                     >
-                      <option value="">Selecione o Apartamento</option>
+                      <option value="">Selecione a Unidade</option>
                       {units.map((u) => (
                         <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
                       ))}
                     </select>
                   </div>
 
+                  <div className="form-group">
+                    <label>Pessoa Responsável (Morador)</label>
+                    <select
+                      className="form-control"
+                      value={vehicleForm.resident_id}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, resident_id: e.target.value })}
+                    >
+                      <option value="">Não associar a morador específico</option>
+                      {unitResidentsForVehicle.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name} ({r.role})</option>
+                      ))}
+                    </select>
+                    {vehicleForm.unit_id && unitResidentsForVehicle.length === 0 && (
+                      <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        Nenhum morador cadastrado nesta unidade.
+                      </small>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-row">
                   <div className="form-group">
                     <label>Tipo de Veículo</label>
                     <select
@@ -462,11 +698,10 @@ export default function ResidentsView({ showToast }) {
                       <option value="Carro">Carro</option>
                       <option value="Moto">Moto</option>
                       <option value="SUV / Caminhonete">SUV / Caminhonete</option>
+                      <option value="Outro">Outro</option>
                     </select>
                   </div>
-                </div>
 
-                <div className="form-row">
                   <div className="form-group">
                     <label>Placa do Veículo *</label>
                     <input
@@ -478,7 +713,9 @@ export default function ResidentsView({ showToast }) {
                       onChange={(e) => setVehicleForm({ ...vehicleForm, plate: e.target.value.toUpperCase() })}
                     />
                   </div>
+                </div>
 
+                <div className="form-row">
                   <div className="form-group">
                     <label>Modelo / Marca *</label>
                     <input
@@ -490,9 +727,7 @@ export default function ResidentsView({ showToast }) {
                       onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
                     />
                   </div>
-                </div>
 
-                <div className="form-row">
                   <div className="form-group">
                     <label>Cor</label>
                     <input
@@ -503,26 +738,26 @@ export default function ResidentsView({ showToast }) {
                       onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
                     />
                   </div>
+                </div>
 
-                  <div className="form-group">
-                    <label>Vaga de Garagem</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Ex: Vaga G1-04"
-                      value={vehicleForm.parking_spot}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, parking_spot: e.target.value })}
-                    />
-                  </div>
+                <div className="form-group">
+                  <label>Vaga de Garagem</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ex: Vaga G1-04"
+                    value={vehicleForm.parking_spot}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, parking_spot: e.target.value })}
+                  />
                 </div>
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsVehicleModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeVehicleModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Cadastrar Veículo
+                  {editingVehicle ? 'Salvar Alterações' : 'Cadastrar Veículo'}
                 </button>
               </div>
             </form>
