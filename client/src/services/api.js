@@ -67,7 +67,10 @@ export const api = {
     return request(`/deliveries${qs ? '?' + qs : ''}`);
   },
   createDelivery: (data) => request('/deliveries', { method: 'POST', body: JSON.stringify(data) }),
+  updateDelivery: (id, data) => request(`/deliveries/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   pickupDelivery: (id, data) => request(`/deliveries/${id}/pickup`, { method: 'PATCH', body: JSON.stringify(data) }),
+  cancelDelivery: (id, data) => request(`/deliveries/${id}/cancel`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteDelivery: (id) => request(`/deliveries/${id}`, { method: 'DELETE' }),
 
   // Portaria / Acesso
   getAccessLogs: (params = {}) => {

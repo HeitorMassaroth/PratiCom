@@ -135,6 +135,112 @@ async function runTestSuite() {
     failCount++;
   }
 
+  // CRUD Encomendas
+  try {
+    console.log('\n--- Teste de CRUD de Encomendas ---');
+    // 1. Criar Encomenda
+    const createDelRes = await fetch(`${apiBase}/api/deliveries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '1' },
+      body: JSON.stringify({
+        unit_id: 1,
+        courier: 'Transportadora Teste',
+        tracking_code: 'TEST12345',
+        description: 'Pacote de Testes CRUD'
+      })
+    });
+    const newDelivery = await createDelRes.json();
+    if (createDelRes.status === 201 && (newDelivery.status === 'PENDING' || newDelivery.status === 'pending') && newDelivery.pickup_code) {
+      console.log(`✅ [201 Created] Encomenda criada no SQLite -> ID: ${newDelivery.id}, PIN: ${newDelivery.pickup_code}, Status: ${newDelivery.status}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao criar encomenda: ${JSON.stringify(newDelivery)}`);
+    }
+
+    // 2. Editar Encomenda
+    const updateDelRes = await fetch(`${apiBase}/api/deliveries/${newDelivery.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '1' },
+      body: JSON.stringify({ description: 'Pacote de Testes Atualizado' })
+    });
+    const updatedDelivery = await updateDelRes.json();
+    if (updateDelRes.ok && updatedDelivery.description === 'Pacote de Testes Atualizado') {
+      console.log(`✅ [200 OK] Encomenda editada com sucesso -> ID: ${updatedDelivery.id}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao editar encomenda: ${JSON.stringify(updatedDelivery)}`);
+    }
+
+    // 3. Teste de Baixa com PIN Incorreto
+    const wrongPinRes = await fetch(`${apiBase}/api/deliveries/${newDelivery.id}/pickup`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '1' },
+      body: JSON.stringify({ pickup_code: '0000', picked_up_by: 'Teste' })
+    });
+    if (wrongPinRes.status === 400) {
+      console.log('✅ [400 Bad Request] Baixa recusada corretamente com PIN incorreto.');
+      successCount++;
+    } else {
+      console.error('❌ Baixa permitida com PIN incorreto.');
+      failCount++;
+    }
+
+    // 4. Teste de Baixa com PIN Correto
+    const correctPinRes = await fetch(`${apiBase}/api/deliveries/${newDelivery.id}/pickup`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '1' },
+      body: JSON.stringify({ pickup_code: newDelivery.pickup_code, picked_up_by: 'Morador Teste' })
+    });
+    const pickedDelivery = await correctPinRes.json();
+    if (correctPinRes.ok && (pickedDelivery.status === 'PICKED_UP' || pickedDelivery.status === 'delivered')) {
+      console.log(`✅ [200 OK] Baixa confirmada com PIN correto -> Status: ${pickedDelivery.status}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao dar baixa na encomenda: ${JSON.stringify(pickedDelivery)}`);
+    }
+
+    // 5. Teste de Cancelamento de Encomenda
+    const secondDelRes = await fetch(`${apiBase}/api/deliveries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '1' },
+      body: JSON.stringify({
+        unit_id: 1,
+        courier: 'Amazon Teste Cancelamento',
+        description: 'Pacote a ser cancelado'
+      })
+    });
+    const secondDel = await secondDelRes.json();
+
+    const cancelRes = await fetch(`${apiBase}/api/deliveries/${secondDel.id}/cancel`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Condominium-Id': '1' },
+      body: JSON.stringify({ reason: 'Motivo de teste automatizado' })
+    });
+    const cancelledDel = await cancelRes.json();
+    if (cancelRes.ok && cancelledDel.status === 'CANCELLED' && cancelledDel.cancellation_reason) {
+      console.log(`✅ [200 OK] Encomenda cancelada com sucesso -> Motivo: ${cancelledDel.cancellation_reason}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao cancelar encomenda: ${JSON.stringify(cancelledDel)}`);
+    }
+
+    // 6. Teste de Exclusão Física de Encomenda Cancelada
+    const deleteDelRes = await fetch(`${apiBase}/api/deliveries/${secondDel.id}`, {
+      method: 'DELETE',
+      headers: { 'X-Condominium-Id': '1' }
+    });
+    const deleteDelData = await deleteDelRes.json();
+    if (deleteDelRes.ok) {
+      console.log(`✅ [200 OK] Encomenda excluída do SQLite -> ${deleteDelData.message}`);
+      successCount++;
+    } else {
+      throw new Error(`Falha ao excluir encomenda: ${JSON.stringify(deleteDelData)}`);
+    }
+  } catch (err) {
+    console.error('❌ Erro no CRUD de Encomendas:', err.message);
+    failCount++;
+  }
+
   // 3. Testes de Feature Flags (LPS)
   console.log('\n--- 3. Validação de Feature Flags da LPS ---');
   try {
