@@ -1,20 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  UserPlus, 
-  Building2, 
-  Car, 
-  Heart, 
-  Phone, 
-  Mail, 
-  Trash2, 
-  Search, 
-  X, 
-  Plus, 
+import {
+  Users,
+  UserPlus,
+  Building2,
+  Car,
+  Heart,
+  Phone,
+  Mail,
+  Trash2,
+  Search,
+  X,
+  Plus,
   ShieldAlert,
-  KeyRound
+  KeyRound,
+  Pencil
 } from 'lucide-react';
 import { api } from '../services/api';
+
+const EMPTY_RESIDENT = {
+  unit_id: '',
+  name: '',
+  email: '',
+  phone: '',
+  cpf: '',
+  role: 'Proprietário',
+  emergency_contact: ''
+};
+
+const EMPTY_VEHICLE = {
+  unit_id: '',
+  resident_id: '',
+  plate: '',
+  model: '',
+  color: '',
+  type: 'Carro',
+  parking_spot: ''
+};
 
 export default function ResidentsView({ showToast }) {
   const [units, setUnits] = useState([]);
@@ -29,27 +50,14 @@ export default function ResidentsView({ showToast }) {
   const [isResidentModalOpen, setIsResidentModalOpen] = useState(false);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
 
+  // null = criando, objeto = editando
+  const [editingResident, setEditingResident] = useState(null);
+
   // Form morador
-  const [residentForm, setResidentForm] = useState({
-    unit_id: '',
-    name: '',
-    email: '',
-    phone: '',
-    cpf: '',
-    role: 'Proprietário',
-    emergency_contact: ''
-  });
+  const [residentForm, setResidentForm] = useState(EMPTY_RESIDENT);
 
   // Form veículo
-  const [vehicleForm, setVehicleForm] = useState({
-    unit_id: '',
-    resident_id: '',
-    plate: '',
-    model: '',
-    color: '',
-    type: 'Carro',
-    parking_spot: ''
-  });
+  const [vehicleForm, setVehicleForm] = useState(EMPTY_VEHICLE);
 
   const loadData = async () => {
     try {
@@ -80,20 +88,50 @@ export default function ResidentsView({ showToast }) {
     loadData();
   };
 
-  const handleCreateResident = async (e) => {
+  const openCreateModal = () => {
+    setEditingResident(null);
+    setResidentForm(EMPTY_RESIDENT);
+    setIsResidentModalOpen(true);
+  };
+
+  const openEditModal = (res) => {
+    setEditingResident(res);
+    setResidentForm({
+      unit_id: String(res.unit_id),
+      name: res.name || '',
+      email: res.email || '',
+      phone: res.phone || '',
+      cpf: res.cpf || '',
+      role: res.role || 'Proprietário',
+      emergency_contact: res.emergency_contact || ''
+    });
+    setIsResidentModalOpen(true);
+  };
+
+  const closeResidentModal = () => {
+    setIsResidentModalOpen(false);
+    setEditingResident(null);
+    setResidentForm(EMPTY_RESIDENT);
+  };
+
+  const handleSubmitResident = async (e) => {
     e.preventDefault();
     if (!residentForm.unit_id || !residentForm.name) {
       showToast('Unidade e nome são obrigatórios.', 'warning');
       return;
     }
     try {
-      await api.createResident(residentForm);
-      showToast('Novo morador cadastrado com sucesso!', 'success');
-      setIsResidentModalOpen(false);
-      setResidentForm({ unit_id: '', name: '', email: '', phone: '', cpf: '', role: 'Proprietário', emergency_contact: '' });
+      if (editingResident) {
+        await api.updateResident(editingResident.id, residentForm);
+        showToast('Morador atualizado com sucesso!', 'success');
+      } else {
+        await api.createResident(residentForm);
+        showToast('Novo morador cadastrado com sucesso!', 'success');
+      }
+      closeResidentModal();
       loadData();
     } catch (err) {
-      showToast(err.message || 'Erro ao cadastrar morador.', 'danger');
+      showToast(err.message || 'Erro ao salvar morador.', 'danger');
     }
   };
 
@@ -118,7 +156,7 @@ export default function ResidentsView({ showToast }) {
       await api.createVehicle(vehicleForm);
       showToast('Veículo cadastrado com sucesso!', 'success');
       setIsVehicleModalOpen(false);
-      setVehicleForm({ unit_id: '', resident_id: '', plate: '', model: '', color: '', type: 'Carro', parking_spot: '' });
+      setVehicleForm(EMPTY_VEHICLE);
       loadData();
     } catch (err) {
       showToast(err.message || 'Erro ao cadastrar veículo.', 'danger');
@@ -133,9 +171,9 @@ export default function ResidentsView({ showToast }) {
           <form onSubmit={handleSearch} style={{ display: 'flex', gap: '8px' }}>
             <div className="search-box" style={{ width: '280px' }}>
               <Search size={16} />
-              <input 
-                type="text" 
-                placeholder="Buscar por morador, CPF, telefone..." 
+              <input
+                type="text"
+                placeholder="Buscar por morador, CPF, telefone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -143,8 +181,8 @@ export default function ResidentsView({ showToast }) {
             <button type="submit" className="btn btn-secondary">Buscar</button>
           </form>
 
-          <select 
-            className="form-control" 
+          <select
+            className="form-control"
             style={{ width: '200px' }}
             value={selectedUnitId}
             onChange={(e) => setSelectedUnitId(e.target.value)}
@@ -160,7 +198,7 @@ export default function ResidentsView({ showToast }) {
           <button className="btn btn-secondary" onClick={() => setIsVehicleModalOpen(true)}>
             <Car size={16} /> Cadastrar Veículo
           </button>
-          <button className="btn btn-primary" onClick={() => setIsResidentModalOpen(true)}>
+          <button className="btn btn-primary" onClick={openCreateModal}>
             <UserPlus size={16} /> Novo Morador
           </button>
         </div>
@@ -198,13 +236,23 @@ export default function ResidentsView({ showToast }) {
                         {res.role}
                       </span>
                     </div>
-                    <button 
-                      style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
-                      title="Excluir cadastro"
-                      onClick={() => handleDeleteResident(res.id, res.name)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {/* Ações: Editar + Excluir */}
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        style={{ background: 'transparent', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', padding: '4px' }}
+                        title="Editar morador"
+                        onClick={() => openEditModal(res)}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '4px' }}
+                        title="Excluir cadastro"
+                        onClick={() => handleDeleteResident(res.id, res.name)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
@@ -252,24 +300,27 @@ export default function ResidentsView({ showToast }) {
         )}
       </div>
 
-      {/* Modal: Novo Morador */}
+      {/* Modal: Criar / Editar Morador */}
       {isResidentModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <UserPlus size={20} color="var(--accent-primary)" /> Cadastrar Novo Morador
+                {editingResident
+                  ? <><Pencil size={20} color="var(--accent-primary)" /> Editar Morador</>
+                  : <><UserPlus size={20} color="var(--accent-primary)" /> Cadastrar Novo Morador</>
+                }
               </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsResidentModalOpen(false)}>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeResidentModal}>
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreateResident}>
+            <form onSubmit={handleSubmitResident}>
               <div className="modal-body">
                 <div className="form-row">
                   <div className="form-group">
                     <label>Unidade (Apartamento) *</label>
-                    <select 
+                    <select
                       className="form-control"
                       required
                       value={residentForm.unit_id}
@@ -284,7 +335,7 @@ export default function ResidentsView({ showToast }) {
 
                   <div className="form-group">
                     <label>Papel / Vínculo *</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={residentForm.role}
                       onChange={(e) => setResidentForm({ ...residentForm, role: e.target.value })}
@@ -299,11 +350,11 @@ export default function ResidentsView({ showToast }) {
 
                 <div className="form-group">
                   <label>Nome Completo *</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    required 
-                    placeholder="Ex: Carlos Eduardo Silva" 
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    placeholder="Ex: Carlos Eduardo Silva"
                     value={residentForm.name}
                     onChange={(e) => setResidentForm({ ...residentForm, name: e.target.value })}
                   />
@@ -312,10 +363,10 @@ export default function ResidentsView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Telefone / WhatsApp</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="(11) 98765-4321" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="(11) 98765-4321"
                       value={residentForm.phone}
                       onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })}
                     />
@@ -323,10 +374,10 @@ export default function ResidentsView({ showToast }) {
 
                   <div className="form-group">
                     <label>E-mail</label>
-                    <input 
-                      type="email" 
-                      className="form-control" 
-                      placeholder="morador@email.com" 
+                    <input
+                      type="email"
+                      className="form-control"
+                      placeholder="morador@email.com"
                       value={residentForm.email}
                       onChange={(e) => setResidentForm({ ...residentForm, email: e.target.value })}
                     />
@@ -336,10 +387,10 @@ export default function ResidentsView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>CPF</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="123.456.789-00" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="123.456.789-00"
                       value={residentForm.cpf}
                       onChange={(e) => setResidentForm({ ...residentForm, cpf: e.target.value })}
                     />
@@ -347,10 +398,10 @@ export default function ResidentsView({ showToast }) {
 
                   <div className="form-group">
                     <label>Contato de Emergência</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="Ex: Maria (Esposa) (11) 99999-8888" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ex: Maria (Esposa) (11) 99999-8888"
                       value={residentForm.emergency_contact}
                       onChange={(e) => setResidentForm({ ...residentForm, emergency_contact: e.target.value })}
                     />
@@ -359,11 +410,11 @@ export default function ResidentsView({ showToast }) {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsResidentModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeResidentModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Salvar Morador
+                  {editingResident ? 'Salvar Alterações' : 'Salvar Morador'}
                 </button>
               </div>
             </form>
@@ -388,7 +439,7 @@ export default function ResidentsView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Unidade *</label>
-                    <select 
+                    <select
                       className="form-control"
                       required
                       value={vehicleForm.unit_id}
@@ -403,7 +454,7 @@ export default function ResidentsView({ showToast }) {
 
                   <div className="form-group">
                     <label>Tipo de Veículo</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={vehicleForm.type}
                       onChange={(e) => setVehicleForm({ ...vehicleForm, type: e.target.value })}
@@ -418,11 +469,11 @@ export default function ResidentsView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Placa do Veículo *</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      required 
-                      placeholder="Ex: BRA2E19" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      required
+                      placeholder="Ex: BRA2E19"
                       value={vehicleForm.plate}
                       onChange={(e) => setVehicleForm({ ...vehicleForm, plate: e.target.value.toUpperCase() })}
                     />
@@ -430,11 +481,11 @@ export default function ResidentsView({ showToast }) {
 
                   <div className="form-group">
                     <label>Modelo / Marca *</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      required 
-                      placeholder="Ex: Toyota Corolla, Honda Civic..." 
+                    <input
+                      type="text"
+                      className="form-control"
+                      required
+                      placeholder="Ex: Toyota Corolla, Honda Civic..."
                       value={vehicleForm.model}
                       onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
                     />
@@ -444,10 +495,10 @@ export default function ResidentsView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Cor</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="Ex: Prata, Preto, Branco" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ex: Prata, Preto, Branco"
                       value={vehicleForm.color}
                       onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
                     />
@@ -455,10 +506,10 @@ export default function ResidentsView({ showToast }) {
 
                   <div className="form-group">
                     <label>Vaga de Garagem</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="Ex: Vaga G1-04" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ex: Vaga G1-04"
                       value={vehicleForm.parking_spot}
                       onChange={(e) => setVehicleForm({ ...vehicleForm, parking_spot: e.target.value })}
                     />

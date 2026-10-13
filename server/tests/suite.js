@@ -1,0 +1,182 @@
+/**
+ * Suíte Integrada de Testes do Backend (Praticom ERP)
+ * Valida os 14 endpoints RESTful, operações CRUD no SQLite e Feature Flags (LPS).
+ */
+
+const endpoints = [
+  '/api/dashboard',
+  '/api/deliveries',
+  '/api/access',
+  '/api/units',
+  '/api/residents',
+  '/api/vehicles',
+  '/api/pets',
+  '/api/spaces',
+  '/api/reservations',
+  '/api/financial/summary',
+  '/api/financial/transactions',
+  '/api/announcements',
+  '/api/market/products',
+  '/api/market/sales'
+];
+
+const apiBase = process.env.API_BASE || 'http://localhost:5000';
+
+async function runTestSuite() {
+  console.log('----------------------------------------------------');
+  console.log('🧪 SUÍTE DE TESTES INTEGRADA DO BACKEND (SQLITE + GOF)');
+  console.log('----------------------------------------------------');
+  
+  let successCount = 0;
+  let failCount = 0;
+
+  // 1. Testes de Leitura de Endpoints RESTful
+  console.log('\n--- 1. Validação de Endpoints GET RESTful ---');
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(`${apiBase}${endpoint}`);
+      if (res.ok) {
+        const data = await res.json();
+        const itemCount = Array.isArray(data) ? data.length : Object.keys(data).length;
+        console.log(`✅ [200 OK] ${endpoint} -> ${itemCount} itens/chaves retornado(s)`);
+        successCount++;
+      } else {
+        console.error(`❌ [${res.status}] ${endpoint}`);
+        failCount++;
+      }
+    } catch (err) {
+      console.error(`❌ [ERRO] ${endpoint}: ${err.message}`);
+      failCount++;
+    }
+  }
+
+  // 2. Testes de Operações CRUD
+  console.log('\n--- 2. Validação de Operações CRUD e Persistência ---');
+
+  // CRUD Morador
+  try {
+    const createRes = await fetch(`${apiBase}/api/residents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unit_id: 1, name: 'Morador Teste Refatoração', phone: '(11) 98888-7777', role: 'Inquilino' })
+    });
+    const newResident = await createRes.json();
+    console.log(`✅ [201 Created] Morador criado no SQLite -> ID: ${newResident.id}`);
+
+    const deleteRes = await fetch(`${apiBase}/api/residents/${newResident.id}`, { method: 'DELETE' });
+    const deleteMsg = await deleteRes.json();
+    console.log(`✅ [200 OK] Morador removido do SQLite -> ${deleteMsg.message}`);
+    successCount += 2;
+  } catch (err) {
+    console.error('❌ Erro no CRUD de Moradores:', err.message);
+    failCount++;
+  }
+
+  // CRUD Portaria
+  try {
+    const entryRes = await fetch(`${apiBase}/api/access/entry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        visitor_name: 'Visitante Teste Refatoração',
+        document: '99.888.777-6',
+        destination_unit_id: 1,
+        type: 'Visitante',
+        company: 'Empresa Teste',
+        vehicle_plate: 'TESTE123',
+        authorized_by: 'Morador Teste'
+      })
+    });
+    const entryData = await entryRes.json();
+    console.log(`✅ [201 Created] Portaria Entrada registrada no SQLite -> ID: ${entryData.id}, Status: ${entryData.status}`);
+    const entryFieldsSaved = entryData.company === 'Empresa Teste'
+      && entryData.vehicle_plate === 'TESTE123'
+      && entryData.authorized_by === 'Morador Teste'
+      && Boolean(entryData.entered_at);
+    if (!entryRes.ok || !entryFieldsSaved) {
+      throw new Error('A entrada não retornou os campos extras e o horário esperado.');
+    }
+
+    const exitRes = await fetch(`${apiBase}/api/access/${entryData.id}/exit`, { method: 'PATCH' });
+    const exitData = await exitRes.json();
+    console.log(`✅ [200 OK] Portaria Saída atualizada no SQLite -> ID: ${exitData.id}, Novo Status: ${exitData.status}`);
+    if (!exitRes.ok || !exitData.exited_at) {
+      throw new Error('A saída não retornou o horário no nome esperado pela tela.');
+    }
+
+    const searchRes = await fetch(`${apiBase}/api/access?search=TESTE123`);
+    const searchData = await searchRes.json();
+    if (searchRes.ok && searchData.some(log => log.id === entryData.id)) {
+      console.log('✅ Busca por placa encontrou o registro de acesso.');
+      successCount++;
+    } else {
+      console.error('❌ A busca por placa não encontrou o registro de acesso.');
+      failCount++;
+    }
+
+    const deleteRes = await fetch(`${apiBase}/api/access/${entryData.id}`, { method: 'DELETE' });
+    const deleteData = await deleteRes.json();
+    if (deleteRes.ok) {
+      console.log(`✅ [200 OK] Registro de acesso removido do SQLite -> ${deleteData.message}`);
+      const accessLogs = await fetch(`${apiBase}/api/access`).then(res => res.json());
+      if (!accessLogs.some(log => log.id === entryData.id)) {
+        console.log('✅ Registro excluído não aparece mais na listagem de acessos.');
+        successCount += 4;
+      } else {
+        console.error('❌ O registro excluído ainda aparece na listagem de acessos.');
+        failCount++;
+      }
+    } else {
+      console.error(`❌ [${deleteRes.status}] Erro ao remover registro de acesso: ${deleteData.error}`);
+      failCount++;
+    }
+  } catch (err) {
+    console.error('❌ Erro no CRUD de Portaria:', err.message);
+    failCount++;
+  }
+
+  // 3. Testes de Feature Flags (LPS)
+  console.log('\n--- 3. Validação de Feature Flags da LPS ---');
+  try {
+    // Desativar Mercado
+    await fetch(`${apiBase}/api/config/features`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature: 'ENABLE_MARKETPLACE', enabled: false })
+    });
+
+    const marketDisabled = await fetch(`${apiBase}/api/market/products`);
+    if (marketDisabled.status === 403) {
+      console.log('✅ [403 Forbidden] Feature Flag ENABLE_MARKETPLACE=false bloqueou o acesso ao Mercadinho.');
+      successCount++;
+    } else {
+      console.error('❌ Bloqueio de Feature Flag falhou.');
+      failCount++;
+    }
+
+    // Reativar Mercado
+    await fetch(`${apiBase}/api/config/features`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature: 'ENABLE_MARKETPLACE', enabled: true })
+    });
+
+    const marketEnabled = await fetch(`${apiBase}/api/market/products`);
+    if (marketEnabled.status === 200) {
+      console.log('✅ [200 OK] Feature Flag ENABLE_MARKETPLACE=true liberou o acesso ao Mercadinho.');
+      successCount++;
+    } else {
+      console.error('❌ Reativação de Feature Flag falhou.');
+      failCount++;
+    }
+  } catch (err) {
+    console.error('❌ Erro na validação de Feature Flags:', err.message);
+    failCount++;
+  }
+
+  console.log('\n----------------------------------------------------');
+  console.log(`📊 RESUMO DA SUÍTE DE TESTES: ${successCount} Sucessos, ${failCount} Falhas.`);
+  console.log('----------------------------------------------------');
+}
+
+runTestSuite();

@@ -21,7 +21,7 @@
 
 O **Praticom** é uma solução ERP completa para condomínios focada em eficiência operacional para síndicos e administradoras, agilidade para a portaria e praticidade e conveniência para os moradores.
 
-A aplicação conta com arquitetura desacoplada (Frontend SPA em React + Backend RESTful em Express), persistência rápida em JSON local com auto-seeding e uma interface fluida com suporte nativo a temas Claro/Escuro e perfis de acesso.
+A aplicação conta com arquitetura desacoplada (Frontend SPA em React + Backend RESTful em Express), persistência relacional em SQLite e uma interface fluida com suporte nativo a temas Claro/Escuro e perfis de acesso.
 
 ---
 
@@ -82,7 +82,7 @@ A aplicação conta com arquitetura desacoplada (Frontend SPA em React + Backend
 ### ⚙️ Backend (`/server`)
 * **Node.js & Express**: Servidor HTTP e rotas de API RESTful.
 * **CORS**: Middleware configurado para integração com o frontend.
-* **Database Engine**: Camada de persistência local (`condo_store.json`) com inicialização automática de sementes (*seed mock data*).
+* **Database Engine**: Banco relacional SQLite (`condo_database.sqlite`), acessado por DAOs com integridade referencial ativa.
 
 ---
 
@@ -104,7 +104,7 @@ condo-erp/
 │   └── vite.config.js          # Configurações do Vite
 │
 ├── server/                     # Servidor Backend (Node.js + Express)
-│   ├── condo_store.json        # Banco de dados local em JSON (criado dinamicamente)
+│   ├── condo_database.sqlite   # Banco de dados relacional SQLite
 │   ├── database.js             # Modelos de dados, regras de negócio e seed inicial
 │   ├── package.json            # Dependências e scripts do Backend
 │   └── server.js               # Definição de rotas da API REST e inicialização

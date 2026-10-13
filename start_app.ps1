@@ -1,8 +1,10 @@
-$env:PATH = "C:\Users\richa\.gemini\antigravity-ide\scratch\nodejs;" + $env:PATH
+# Script de Inicialização do Praticom (Backend + Frontend)
 
-# Iniciar servidor backend em segundo plano
-Start-Process -FilePath "C:\Users\richa\.gemini\antigravity-ide\scratch\nodejs\node.exe" -ArgumentList "server.js" -WorkingDirectory "C:\Users\richa\.gemini\antigravity-ide\scratch\condo-erp\server" -WindowStyle Hidden
+$projectRoot = $PSScriptRoot
 
-# Iniciar frontend Vite
-Set-Location "C:\Users\richa\.gemini\antigravity-ide\scratch\condo-erp\client"
-& "C:\Users\richa\.gemini\antigravity-ide\scratch\nodejs\npm.cmd" run dev
+Write-Host "🚀 Iniciando backend Node.js / Express..." -ForegroundColor Cyan
+Start-Process -FilePath "node" -ArgumentList "server.js" -WorkingDirectory "$projectRoot\server" -WindowStyle Hidden
+
+Write-Host "🚀 Iniciando frontend Vite / React..." -ForegroundColor Cyan
+Set-Location "$projectRoot\client"
+npm run dev

@@ -9,6 +9,7 @@ import ResidentsView from './views/ResidentsView';
 import ReservationsView from './views/ReservationsView';
 import AnnouncementsView from './views/AnnouncementsView';
 import MarketInventoryView from './views/MarketInventoryView';
+import CondominiumsBlocksView from './views/CondominiumsBlocksView';
 import { api } from './services/api';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dashboardData, setDashboardData] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const [availableModules, setAvailableModules] = useState(['dashboard', 'access', 'deliveries', 'reservations', 'financial', 'market']);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -43,15 +45,55 @@ export default function App() {
       const data = await api.getDashboard();
       setDashboardData(data);
     } catch (err) {
-      console.error('Erro ao buscar métricas:', err);
+      console.warn('Dashboard não disponível ou com erro:', err.message);
     }
+  };
+
+  const loadCondoModules = async () => {
+    try {
+      const modulesList = await api.getActiveCondominiumModules();
+      if (Array.isArray(modulesList)) {
+        const enabledKeys = modulesList.filter(m => m.enabled).map(m => m.module_key);
+        setAvailableModules(enabledKeys);
+
+        // Fallback de navegação se a view atual estiver desativada no condomínio ativo
+        const mandatoryViews = ['residents', 'territory', 'announcements'];
+        setCurrentView(prevView => {
+          if (mandatoryViews.includes(prevView)) return prevView;
+          if (enabledKeys.includes(prevView)) return prevView;
+          // Se o módulo da tela atual não estiver disponível, redireciona suavemente
+          return enabledKeys.includes('dashboard') ? 'dashboard' : 'residents';
+        });
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar módulos ativos:', err.message);
+    }
+  };
+
+  const [condoRefreshKey, setCondoRefreshKey] = useState(Date.now());
+
+  const handleCondoChange = () => {
+    loadCondoModules();
+    loadDashboardMetrics();
+    setCondoRefreshKey(Date.now());
   };
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    loadCondoModules();
     loadDashboardMetrics();
     const interval = setInterval(loadDashboardMetrics, 15000);
-    return () => clearInterval(interval);
+
+    const onModulesChanged = () => {
+      loadCondoModules();
+      loadDashboardMetrics();
+    };
+    window.addEventListener('condo-modules-changed', onModulesChanged);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('condo-modules-changed', onModulesChanged);
+    };
   }, []);
 
   return (
@@ -61,21 +103,25 @@ export default function App() {
         currentView={currentView} 
         setCurrentView={setCurrentView} 
         stats={dashboardData?.metrics}
+        availableModules={availableModules}
       />
 
       {/* Área Principal */}
       <div className="main-wrapper">
         <Header 
           currentView={currentView}
+          setCurrentView={setCurrentView}
           theme={theme}
           toggleTheme={toggleTheme}
           userRole={userRole}
           setUserRole={setUserRole}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
+          showToast={showToast}
+          onCondoChange={handleCondoChange}
         />
 
-        <main className="content-body">
+        <main className="content-body" key={condoRefreshKey}>
           {currentView === 'dashboard' && (
             <DashboardView 
               data={dashboardData} 
@@ -111,6 +157,8 @@ export default function App() {
           {currentView === 'market' && (
             <MarketInventoryView showToast={showToast} />
           )}
+
+          {currentView === 'territory' && <CondominiumsBlocksView showToast={showToast} />}
         </main>
       </div>
 

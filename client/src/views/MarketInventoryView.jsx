@@ -22,6 +22,7 @@ export default function MarketInventoryView({ showToast }) {
   const [products, setProducts] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [featureDisabled, setFeatureDisabled] = useState(false);
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'pos'
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,16 +49,33 @@ export default function MarketInventoryView({ showToast }) {
   const loadData = async () => {
     try {
       setLoading(true);
+      setFeatureDisabled(false);
       const [prodRes, unitRes] = await Promise.all([
         api.getMarketProducts({ category: categoryFilter }),
         api.getUnits()
       ]);
-      setProducts(prodRes);
-      setUnits(unitRes);
+      setProducts(Array.isArray(prodRes) ? prodRes : []);
+      setUnits(Array.isArray(unitRes) ? unitRes : []);
     } catch (err) {
-      showToast('Erro ao carregar dados do mercadinho.', 'danger');
+      setProducts([]);
+      setUnits([]);
+      if (err.message && (err.message.includes('LPS') || err.message.includes('ENABLE_MARKETPLACE') || err.message.includes('desativada'))) {
+        setFeatureDisabled(true);
+      } else {
+        showToast(err.message || 'Erro ao carregar dados do mercadinho.', 'danger');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEnableFeature = async () => {
+    try {
+      await api.updateFeature('ENABLE_MARKETPLACE', true);
+      showToast('Funcionalidade Mercadinho ativada na LPS com sucesso!', 'success');
+      loadData();
+    } catch (err) {
+      showToast('Erro ao ativar funcionalidade na LPS.', 'danger');
     }
   };
 
@@ -172,16 +190,33 @@ export default function MarketInventoryView({ showToast }) {
     }
   };
 
-  const filteredProducts = products.filter(p => {
-    const term = searchTerm.toLowerCase();
+  const filteredProducts = (Array.isArray(products) ? products : []).filter(p => {
+    const term = (searchTerm || '').toLowerCase();
     return (
-      p.name.toLowerCase().includes(term) ||
-      p.category.toLowerCase().includes(term) ||
+      (p.name && p.name.toLowerCase().includes(term)) ||
+      (p.category && p.category.toLowerCase().includes(term)) ||
       (p.barcode && p.barcode.includes(term))
     );
   });
 
-  const lowStockCount = products.filter(p => p.stock_quantity <= p.min_stock).length;
+  const lowStockCount = (Array.isArray(products) ? products : []).filter(p => p.stock_quantity <= p.min_stock).length;
+
+  if (featureDisabled) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '48px 24px', maxWidth: '640px', margin: '40px auto' }}>
+        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <AlertTriangle size={32} />
+        </div>
+        <h3 style={{ fontSize: '1.4rem', fontWeight: '800', marginBottom: '10px', color: 'var(--text-main)' }}>Módulo Desativado na LPS</h3>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.6', fontSize: '0.95rem' }}>
+          A funcionalidade <strong>Mercadinho Autônomo & Estoque</strong> está desativada na configuração de Feature Flags (<code>ENABLE_MARKETPLACE = false</code>).
+        </p>
+        <button className="btn btn-primary" onClick={handleEnableFeature} style={{ margin: '0 auto', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <Sparkles size={18} /> Ativar Mercadinho Autônomo na LPS
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>

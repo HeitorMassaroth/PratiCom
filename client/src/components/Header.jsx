@@ -1,13 +1,15 @@
 import React from 'react';
 import { Sun, Moon, Search, Bell, Shield, User, Building } from 'lucide-react';
+import CondominiumSelector from './CondominiumSelector';
 
-export default function Header({ currentView, theme, toggleTheme, userRole, setUserRole, searchTerm, setSearchTerm }) {
+export default function Header({ currentView, setCurrentView, theme, toggleTheme, userRole, setUserRole, searchTerm, setSearchTerm, showToast, onCondoChange }) {
   const titles = {
     dashboard: { title: 'Visão Geral & Dashboard', subtitle: 'Painel executivo com métricas consolidadas em tempo real' },
     deliveries: { title: 'Controle de Encomendas', subtitle: 'Recebimento de pacotes, notificação e confirmação por PIN' },
     financial: { title: 'Gestão Financeira & Boletos', subtitle: 'Controle de fluxo de caixa, despesas e inadimplência por unidade' },
     access: { title: 'Portaria & Controle de Acessos', subtitle: 'Registro de entrada e saída de visitantes, prestadores e veículos' },
     residents: { title: 'Cadastro de Pessoas & Unidades', subtitle: 'Diretório de moradores, apartamentos, veículos e animais de estimação' },
+    territory: { title: 'Condomínios & Blocos', subtitle: 'Estrutura territorial, blocos e associação segura de unidades' },
     reservations: { title: 'Reservas de Áreas Comuns', subtitle: 'Agendamento de churrasqueira, salão e quadra (Limite: 1 hora por pessoa/dia)' },
     announcements: { title: 'Mural de Comunicados', subtitle: 'Informativos, convocações de assembleia e avisos urgentes aos moradores' },
     market: { title: 'Mercadinho Autônomo & Estoque', subtitle: 'Controle de estoque, alerta de reposição e terminal PDV de autoatendimento' },
@@ -25,6 +27,13 @@ export default function Header({ currentView, theme, toggleTheme, userRole, setU
       </div>
 
       <div className="topbar-right">
+        {/* Seletor Visual de Condomínio Ativo */}
+        <CondominiumSelector 
+          onCondoChange={onCondoChange}
+          showToast={showToast}
+          setCurrentView={setCurrentView}
+        />
+
         <div className="search-box">
           <Search size={16} />
           <input
