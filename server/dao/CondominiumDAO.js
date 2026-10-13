@@ -80,13 +80,33 @@ export class CondominiumDAO {
     if (!condominium) throw new Error('Condomínio não encontrado.');
     if (condominium.status !== 'ACTIVE') throw new Error('Condomínio inativo não aceita novos blocos.');
     if (!data.name?.trim()) throw new Error('Nome do bloco é obrigatório.');
-    const info = this.db.prepare('INSERT INTO blocks (condominium_id, name, description) VALUES (?, ?, ?)').run(id(condominiumId), data.name.trim(), data.description || null);
+    
+    const trimmedName = data.name.trim();
+    const existing = this.db.prepare(
+      'SELECT id FROM blocks WHERE condominium_id = ? AND LOWER(TRIM(name)) = LOWER(?)'
+    ).get(id(condominiumId), trimmedName);
+    if (existing) {
+      throw new Error(`Já existe um bloco chamado '${trimmedName}' neste condomínio.`);
+    }
+
+    const info = this.db.prepare('INSERT INTO blocks (condominium_id, name, description) VALUES (?, ?, ?)').run(id(condominiumId), trimmedName, data.description || null);
     return this.getBlock(info.lastInsertRowid);
   }
 
   updateBlock(blockId, data) {
     if (!data.name?.trim()) throw new Error('Nome do bloco é obrigatório.');
-    const result = this.db.prepare('UPDATE blocks SET name=?, description=? WHERE id=?').run(data.name.trim(), data.description || null, id(blockId));
+    const block = this.getBlock(blockId);
+    if (!block) throw new Error('Bloco não encontrado.');
+
+    const trimmedName = data.name.trim();
+    const existing = this.db.prepare(
+      'SELECT id FROM blocks WHERE condominium_id = ? AND LOWER(TRIM(name)) = LOWER(?) AND id != ?'
+    ).get(block.condominium_id, trimmedName, id(blockId));
+    if (existing) {
+      throw new Error(`Já existe outro bloco chamado '${trimmedName}' neste condomínio.`);
+    }
+
+    const result = this.db.prepare('UPDATE blocks SET name=?, description=? WHERE id=?').run(trimmedName, data.description || null, id(blockId));
     if (!result.changes) throw new Error('Bloco não encontrado.');
     return this.getBlock(blockId);
   }

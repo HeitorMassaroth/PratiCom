@@ -80,6 +80,67 @@ class DatabaseSingleton {
       ON condominium_modules(condominium_id, module_key, enabled);
     `);
 
+    this.ensureUnitUniquenessConstraint();
+  }
+
+  ensureUnitUniquenessConstraint() {
+    const tableExists = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'units'").get();
+    if (!tableExists) return;
+
+    // Saneamento de duplicidades legadas no Condomínio 1 se existirem
+    const dupUnits = this.db.prepare(`
+      SELECT block_id, number, COUNT(*) as count 
+      FROM units 
+      WHERE block_id IS NOT NULL 
+      GROUP BY block_id, number 
+      HAVING count > 1
+    `).all();
+
+    if (dupUnits.length > 0) {
+      let torreB = this.db.prepare("SELECT id FROM blocks WHERE condominium_id = 1 AND LOWER(name) = 'torre b'").get();
+      if (!torreB) {
+        const info = this.db.prepare("INSERT INTO blocks (condominium_id, name, description, status) VALUES (1, 'Torre B', 'Bloco B Residencial', 'ACTIVE')").run();
+        torreB = { id: info.lastInsertRowid };
+      }
+      this.db.prepare("UPDATE blocks SET name = 'Torre A' WHERE id = 3 AND name = 'Bloco A'").run();
+      this.db.prepare("UPDATE units SET block_id = ?, block = 'Torre B' WHERE block = 'Torre B' OR id IN (7, 8, 9, 10, 11, 12)").run(torreB.id);
+    }
+
+    // Verifica se a tabela units ainda possui o índice antigo baseado em (block, number)
+    const unitIndexes = this.db.prepare("PRAGMA index_list('units')").all();
+    let hasOldIndex = false;
+    for (const idx of unitIndexes) {
+      if (idx.unique) {
+        const cols = this.db.prepare(`PRAGMA index_info('${idx.name}')`).all().map(c => c.name);
+        if (cols.includes('block') && !cols.includes('block_id')) {
+          hasOldIndex = true;
+          break;
+        }
+      }
+    }
+
+    if (hasOldIndex) {
+      this.db.exec(`
+        PRAGMA foreign_keys = OFF;
+        CREATE TABLE units_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            block TEXT NOT NULL,
+            number TEXT NOT NULL,
+            floor INTEGER,
+            type TEXT DEFAULT 'Residencial',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            block_id INTEGER,
+            UNIQUE(block_id, number),
+            FOREIGN KEY (block_id) REFERENCES blocks(id) ON DELETE RESTRICT
+        );
+        INSERT INTO units_new (id, block, number, floor, type, created_at, block_id)
+        SELECT id, block, number, floor, type, created_at, block_id FROM units;
+        DROP TABLE units;
+        ALTER TABLE units_new RENAME TO units;
+        CREATE INDEX IF NOT EXISTS idx_units_block ON units(block_id);
+        PRAGMA foreign_keys = ON;
+      `);
+    }
   }
 
   seedCondominiumModules() {

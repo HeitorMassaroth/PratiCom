@@ -23,8 +23,11 @@ const marketDAO = DAOFactory.getDAO('market');
 const condominiumDAO = DAOFactory.getDAO('condominium');
 
 const territoryError = (res, err) => {
-  const message = err.message || 'Erro ao processar operação territorial.';
-  const status = /não encontrado/i.test(message) ? 404 : /excluir|duplicad|restri/i.test(message) ? 409 : 400;
+  let message = err.message || 'Erro ao processar operação territorial.';
+  if (/UNIQUE constraint failed: blocks/i.test(message)) {
+    message = 'Já existe um bloco com este nome neste condomínio.';
+  }
+  const status = /não encontrado/i.test(message) ? 404 : /excluir|duplicad|restri|já existe|já está/i.test(message) ? 409 : 400;
   return res.status(status).json({ error: message });
 };
 
@@ -284,11 +287,15 @@ app.post('/api/units', (req, res) => {
     if (!block_id || !number) {
       return res.status(400).json({ error: 'Bloco e número da unidade são obrigatórios.' });
     }
-    const created = residentDAO.createUnit(req.body);
+    const created = residentDAO.createUnit(req.body, { condominiumId: req.condominiumId });
     res.status(201).json(created);
   } catch (err) {
-    const status = /já existe|já está|duplicad/i.test(err.message) ? 409 : 400;
-    res.status(status).json({ error: err.message });
+    let msg = err.message;
+    if (/UNIQUE constraint failed: units/i.test(msg)) {
+      msg = 'Esta unidade já está cadastrada neste bloco.';
+    }
+    const status = /já existe|já está|duplicad|pertence/i.test(msg) ? 409 : 400;
+    res.status(status).json({ error: msg });
   }
 });
 
@@ -304,11 +311,15 @@ app.get('/api/units/:id', (req, res) => {
 
 app.patch('/api/units/:id', (req, res) => {
   try {
-    const updated = residentDAO.updateUnit(req.params.id, req.body);
+    const updated = residentDAO.updateUnit(req.params.id, req.body, { condominiumId: req.condominiumId });
     res.json(updated);
   } catch (err) {
-    const status = /já existe|duplicad/i.test(err.message) ? 409 : 400;
-    res.status(status).json({ error: err.message });
+    let msg = err.message;
+    if (/UNIQUE constraint failed: units/i.test(msg)) {
+      msg = 'Esta unidade já existe neste bloco.';
+    }
+    const status = /já existe|já está|duplicad|pertence/i.test(msg) ? 409 : 400;
+    res.status(status).json({ error: msg });
   }
 });
 

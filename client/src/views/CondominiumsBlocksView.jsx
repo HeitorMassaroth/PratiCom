@@ -215,8 +215,13 @@ export default function CondominiumsBlocksView({ showToast }) {
     if (!selected) return showToast('Selecione um condomínio primeiro.', 'warning');
     if (!blockName.trim()) return showToast('Informe o nome do bloco.', 'warning');
 
+    const trimmed = blockName.trim();
+    if (blocks.some(b => b.name.trim().toLowerCase() === trimmed.toLowerCase())) {
+      return showToast(`Já existe um bloco chamado "${trimmed}" neste condomínio.`, 'warning');
+    }
+
     try { 
-      await api.createBlock(selected, { name: blockName.trim() }); 
+      await api.createBlock(selected, { name: trimmed }); 
       setBlockName(''); 
       showToast('Bloco cadastrado com sucesso!', 'success'); 
       setBlocks(await api.getBlocks(selected)); 
@@ -229,8 +234,15 @@ export default function CondominiumsBlocksView({ showToast }) {
   const handleUpdateBlock = async (event) => {
     event.preventDefault();
     if (!editingBlock) return;
+    const trimmed = editingBlock.name?.trim();
+    if (!trimmed) return showToast('Informe o nome do bloco.', 'warning');
+
+    if (blocks.some(b => b.id !== editingBlock.id && b.name.trim().toLowerCase() === trimmed.toLowerCase())) {
+      return showToast(`Já existe outro bloco chamado "${trimmed}" neste condomínio.`, 'warning');
+    }
+
     try {
-      await api.updateBlock(editingBlock.id, { name: editingBlock.name, description: editingBlock.description });
+      await api.updateBlock(editingBlock.id, { name: trimmed, description: editingBlock.description });
       showToast('Bloco atualizado com sucesso.', 'success');
       setEditingBlock(null);
       setBlocks(await api.getBlocks(selected));
@@ -259,9 +271,14 @@ export default function CondominiumsBlocksView({ showToast }) {
     if (!unitForm.block_id) return showToast('Selecione um bloco para a unidade.', 'warning');
     if (!unitForm.number || !unitForm.number.trim()) return showToast('Informe o número da unidade.', 'warning');
 
+    const trimmedNum = unitForm.number.trim();
+    if (units.some(u => String(u.block_id) === String(unitForm.block_id) && u.number.trim().toLowerCase() === trimmedNum.toLowerCase())) {
+      return showToast(`A unidade "${trimmedNum}" já está cadastrada neste bloco.`, 'warning');
+    }
+
     try {
-      await api.createUnit(unitForm);
-      showToast(`Unidade "${unitForm.number}" cadastrada com sucesso!`, 'success');
+      await api.createUnit({ ...unitForm, number: trimmedNum });
+      showToast(`Unidade "${trimmedNum}" cadastrada com sucesso!`, 'success');
       setIsCreatingUnit(false);
       setUnitForm({ block_id: blocks[0]?.id ? String(blocks[0].id) : '', number: '', floor: '1', type: 'Residencial' });
       await load();
@@ -273,9 +290,17 @@ export default function CondominiumsBlocksView({ showToast }) {
   const handleUpdateUnit = async (event) => {
     event.preventDefault();
     if (!editingUnit) return;
+    const trimmedNum = String(editingUnit.number || '').trim();
+    if (!trimmedNum) return showToast('Informe o número da unidade.', 'warning');
+
+    const targetBlockId = editingUnit.block_id;
+    if (units.some(u => u.id !== editingUnit.id && String(u.block_id) === String(targetBlockId) && u.number.trim().toLowerCase() === trimmedNum.toLowerCase())) {
+      return showToast(`A unidade "${trimmedNum}" já existe neste bloco.`, 'warning');
+    }
+
     try {
-      await api.updateUnit(editingUnit.id, editingUnit);
-      showToast(`Unidade "${editingUnit.number}" atualizada com sucesso!`, 'success');
+      await api.updateUnit(editingUnit.id, { ...editingUnit, number: trimmedNum });
+      showToast(`Unidade "${trimmedNum}" atualizada com sucesso!`, 'success');
       setEditingUnit(null);
       await load();
     } catch (err) {
