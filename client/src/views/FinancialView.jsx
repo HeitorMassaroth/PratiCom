@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  DollarSign, 
-  Plus, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertCircle, 
-  CheckCircle2, 
-  Clock, 
-  FileText, 
-  Filter, 
+import {
+  DollarSign,
+  Plus,
+  TrendingUp,
+  TrendingDown,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Filter,
   X,
   CreditCard,
   Building,
@@ -82,7 +82,6 @@ export default function FinancialView({ showToast }) {
         status: 'pending'
       });
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao registrar transação.', 'danger');
     }
@@ -93,7 +92,6 @@ export default function FinancialView({ showToast }) {
       await api.payFinancialTransaction(id);
       showToast('Pagamento confirmado e quitado com sucesso!', 'success');
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao registrar pagamento.', 'danger');
     }
@@ -194,10 +192,10 @@ export default function FinancialView({ showToast }) {
       {/* Filtros e Ações */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <select 
-            className="form-control" 
-            style={{ width: '160px' }} 
-            value={typeFilter} 
+          <select
+            className="form-control"
+            style={{ width: '160px' }}
+            value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
           >
             <option value="">Todos os Tipos</option>
@@ -205,10 +203,10 @@ export default function FinancialView({ showToast }) {
             <option value="expense">Despesas (-)</option>
           </select>
 
-          <select 
-            className="form-control" 
-            style={{ width: '160px' }} 
-            value={statusFilter} 
+          <select
+            className="form-control"
+            style={{ width: '160px' }}
+            value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">Todos os Status</option>
@@ -217,10 +215,10 @@ export default function FinancialView({ showToast }) {
             <option value="overdue">Vencidos (Inadimplentes)</option>
           </select>
 
-          <select 
-            className="form-control" 
-            style={{ width: '180px' }} 
-            value={categoryFilter} 
+          <select
+            className="form-control"
+            style={{ width: '180px' }}
+            value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >
             <option value="">Todas Categorias</option>
@@ -282,8 +280,8 @@ export default function FinancialView({ showToast }) {
                       )}
                     </td>
                     <td>
-                      <div style={{ 
-                        fontWeight: '800', 
+                      <div style={{
+                        fontWeight: '800',
                         fontSize: '0.95rem',
                         color: tx.type?.toUpperCase() === 'INCOME' ? '#10b981' : '#ef4444',
                         display: 'flex',
@@ -301,14 +299,14 @@ export default function FinancialView({ showToast }) {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {tx.status?.toUpperCase() !== 'PAID' ? (
-                        <button 
+                        <button
                           className="btn btn-success btn-sm"
                           onClick={() => handlePay(tx.id)}
                         >
                           <CheckCircle2 size={14} /> Dar Baixa
                         </button>
                       ) : (
-                        <button 
+                        <button
                           className="btn btn-secondary btn-sm"
                           title="Imprimir Comprovante / Recibo"
                           onClick={() => showToast(`Recibo emitido para ${tx.document_number}`, 'info')}
@@ -342,7 +340,7 @@ export default function FinancialView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Tipo de Transação *</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.type}
                       onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -354,7 +352,7 @@ export default function FinancialView({ showToast }) {
 
                   <div className="form-group">
                     <label>Categoria *</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -372,11 +370,11 @@ export default function FinancialView({ showToast }) {
 
                 <div className="form-group">
                   <label>Descrição do Lançamento *</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    required 
-                    placeholder="Ex: Taxa Condominial Ref. 09/2026, Troca de lâmpadas LED..." 
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    placeholder="Ex: Taxa Condominial Ref. 09/2026, Troca de lâmpadas LED..."
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
@@ -385,12 +383,12 @@ export default function FinancialView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Valor (R$) *</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      className="form-control" 
-                      required 
-                      placeholder="0.00" 
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      required
+                      placeholder="0.00"
                       value={formData.amount}
                       onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                     />
@@ -398,10 +396,10 @@ export default function FinancialView({ showToast }) {
 
                   <div className="form-group">
                     <label>Data de Vencimento *</label>
-                    <input 
-                      type="date" 
-                      className="form-control" 
-                      required 
+                    <input
+                      type="date"
+                      className="form-control"
+                      required
                       value={formData.due_date}
                       onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                     />
@@ -411,7 +409,7 @@ export default function FinancialView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Vincular à Unidade (Opcional)</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.unit_id}
                       onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
@@ -425,7 +423,7 @@ export default function FinancialView({ showToast }) {
 
                   <div className="form-group">
                     <label>Status Inicial</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.status}
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}

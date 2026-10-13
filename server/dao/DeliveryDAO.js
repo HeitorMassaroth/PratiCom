@@ -24,7 +24,7 @@ export class DeliveryDAO {
   getDeliveries({ condominiumId, status, unit_id } = {}) {
     const scope = this.tenantScope(condominiumId);
     let sql = `
-      SELECT d.*, COALESCE(b.name, u.block) as block, u.number as unit_number, r.name as resident_name
+      SELECT d.*, u.block, u.number as unit_number, r.name as resident_name
       FROM deliveries d
       LEFT JOIN units u ON d.unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
@@ -50,7 +50,7 @@ export class DeliveryDAO {
   getDelivery(id, condominiumId) {
     const scope = this.tenantScope(condominiumId);
     return this.db.prepare(`
-      SELECT d.*, COALESCE(b.name, u.block) as block, u.number as unit_number, r.name as resident_name
+      SELECT d.*, u.block, u.number as unit_number, r.name as resident_name
       FROM deliveries d
       LEFT JOIN units u ON d.unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
@@ -178,23 +178,6 @@ export class DeliveryDAO {
     `);
 
     stmt.run(picked_up_by || 'Morador', delivery.id);
-    return this.getDelivery(delivery.id);
-  }
-
-  cancelDelivery(id, { reason, cancelledBy } = {}, condominiumId) {
-    const delivery = this.getDelivery(id, condominiumId);
-    if (!delivery) {
-      throw new Error('Encomenda não encontrada.');
-    }
-    if (delivery.status === 'delivered') {
-      throw new Error('Não é possível cancelar uma encomenda que já foi retirada.');
-    }
-    const stmt = this.db.prepare(`
-      UPDATE deliveries
-      SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancelled_by = ?, cancellation_reason = ?
-      WHERE id = ?
-    `);
-    stmt.run(cancelledBy || 'Portaria', reason || 'Cancelada pela portaria', delivery.id);
     return this.getDelivery(delivery.id);
   }
 }

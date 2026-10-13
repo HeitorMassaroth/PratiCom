@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Package, 
-  Plus, 
-  Search, 
-  CheckCircle, 
-  Key, 
-  Send, 
-  QrCode, 
-  X, 
+import {
+  Package,
+  Plus,
+  Search,
+  CheckCircle,
+  Key,
+  Send,
+  QrCode,
+  X,
   Filter,
   CheckCircle2,
   Clock,
@@ -110,7 +110,6 @@ export default function DeliveriesView({ showToast }) {
       }
       closeDeliveryModal();
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao salvar encomenda.', 'danger');
     }
@@ -122,7 +121,6 @@ export default function DeliveriesView({ showToast }) {
       await api.deleteDelivery(pkg.id);
       showToast('Encomenda excluída.', 'info');
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao excluir encomenda.', 'danger');
     }
@@ -142,7 +140,6 @@ export default function DeliveriesView({ showToast }) {
       setPickupPinInput('');
       setPickedUpByInput('');
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao confirmar retirada. Verifique o PIN.', 'danger');
     }
@@ -159,7 +156,7 @@ export default function DeliveriesView({ showToast }) {
     );
   });
 
-  const availableResidentsForUnit = formData.unit_id 
+  const availableResidentsForUnit = formData.unit_id
     ? residents.filter(r => r.unit_id === parseInt(formData.unit_id, 10))
     : [];
 
@@ -170,16 +167,16 @@ export default function DeliveriesView({ showToast }) {
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <div className="search-box" style={{ width: '280px' }}>
             <Search size={16} />
-            <input 
-              type="text" 
-              placeholder="Buscar por unidade, morador, código..." 
+            <input
+              type="text"
+              placeholder="Buscar por unidade, morador, código..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
-          <select 
-            className="form-control" 
+
+          <select
+            className="form-control"
             style={{ width: '180px' }}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -269,14 +266,14 @@ export default function DeliveriesView({ showToast }) {
                     <td style={{ textAlign: 'right' }}>
                       {pkg.status === 'pending' ? (
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button 
+                          <button
                             className="btn btn-secondary btn-sm"
                             title="Simular Notificação WhatsApp"
                             onClick={() => showToast(`Notificação enviada ao morador da unidade ${pkg.block} - ${pkg.unit_number} com PIN: ${pkg.pickup_code}`, 'info')}
                           >
                             <Send size={14} /> Notificar
                           </button>
-                          <button 
+                          <button
                             className="btn btn-success btn-sm"
                             onClick={() => {
                               setSelectedDelivery(pkg);
@@ -342,7 +339,7 @@ export default function DeliveriesView({ showToast }) {
               <div className="modal-body">
                 <div className="form-group">
                   <label>Unidade de Destino *</label>
-                  <select 
+                  <select
                     className="form-control"
                     required
                     value={formData.unit_id}
@@ -358,7 +355,7 @@ export default function DeliveriesView({ showToast }) {
                 {formData.unit_id && (
                   <div className="form-group">
                     <label>Morador Destinatário (Opcional)</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.resident_id}
                       onChange={(e) => setFormData({ ...formData, resident_id: e.target.value })}
@@ -374,7 +371,7 @@ export default function DeliveriesView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Empresa / Transportadora *</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.courier}
                       onChange={(e) => setFormData({ ...formData, courier: e.target.value })}
@@ -392,10 +389,10 @@ export default function DeliveriesView({ showToast }) {
 
                   <div className="form-group">
                     <label>Código de Rastreio</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      placeholder="Ex: BR123456789" 
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Ex: BR123456789"
                       value={formData.tracking_code}
                       onChange={(e) => setFormData({ ...formData, tracking_code: e.target.value })}
                     />
@@ -404,10 +401,10 @@ export default function DeliveriesView({ showToast }) {
 
                 <div className="form-group">
                   <label>Descrição do Pacote / Volume</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Ex: Caixa média Mercado Livre, Envelope lacrado..." 
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ex: Caixa média Mercado Livre, Envelope lacrado..."
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
@@ -415,9 +412,9 @@ export default function DeliveriesView({ showToast }) {
 
                 <div className="form-group">
                   <label>Observações da Portaria</label>
-                  <textarea 
-                    className="form-control" 
-                    rows="2" 
+                  <textarea
+                    className="form-control"
+                    rows="2"
                     placeholder="Ex: Deixado na gaveta 3 da portaria"
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -460,10 +457,10 @@ export default function DeliveriesView({ showToast }) {
 
                 <div className="form-group">
                   <label>Digite o PIN de Retirada (4 Dígitos do Morador) *</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    required 
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
                     placeholder="Ex: 7492"
                     maxLength={4}
                     style={{ fontSize: '1.4rem', letterSpacing: '0.3em', textAlign: 'center', fontWeight: 'bold' }}
@@ -477,10 +474,10 @@ export default function DeliveriesView({ showToast }) {
 
                 <div className="form-group">
                   <label>Nome de quem está retirando na portaria</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Ex: O próprio morador, filho, funcionário..." 
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ex: O próprio morador, filho, funcionário..."
                     value={pickedUpByInput}
                     onChange={(e) => setPickedUpByInput(e.target.value)}
                   />

@@ -20,10 +20,10 @@ export class FinancialDAO {
     if (condominiumId) {
       const cId = parseInt(condominiumId, 10);
       if (cId === 1) {
-        whereClause += ' AND (f.condominium_id = 1 OR (f.condominium_id IS NULL AND (b.condominium_id = 1 OR u.block_id IS NULL)))';
+        whereClause += ' AND (f.condominium_id = 1 OR f.condominium_id IS NULL OR b.condominium_id = 1 OR u.block_id IS NULL)';
         unitWhereClause += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
       } else {
-        whereClause += ' AND (f.condominium_id = ? OR (f.condominium_id IS NULL AND b.condominium_id = ?))';
+        whereClause += ' AND (f.condominium_id = ? OR b.condominium_id = ?)';
         params.push(cId, cId);
         unitWhereClause += ' AND b.condominium_id = ?';
         unitParams.push(cId);
@@ -58,7 +58,7 @@ export class FinancialDAO {
 
     const defaultRate = totalUnits > 0 ? (overdueCount / totalUnits) * 100 : 0;
     const delinquencyByUnit = this.db.prepare(`
-      SELECT COALESCE(b.name, u.block) as block, u.number AS unit_number, SUM(f.amount) AS total_debt
+      SELECT u.block, u.number AS unit_number, SUM(f.amount) AS total_debt
       FROM financial_transactions f
       JOIN units u ON f.unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
@@ -80,9 +80,8 @@ export class FinancialDAO {
         pending: totals?.expense_pending || 0,
         overdue: totals?.expense_overdue || 0
       },
-      currentBalance: parseFloat((incomePaid - expensePaid).toFixed(2)),
+      currentBalance: incomePaid - expensePaid,
       default_rate: parseFloat(defaultRate.toFixed(1)),
-      overdueCount: overdueCount || 0,
       delinquencyByUnit
     };
   }
@@ -90,7 +89,7 @@ export class FinancialDAO {
   getTransactions({ condominiumId, status, type, category, search } = {}) {
     let sql = `
       SELECT f.*, f.id AS document_number, f.paid_at AS payment_date,
-        COALESCE(b.name, u.block) as block, u.number as unit_number
+        u.block, u.number as unit_number
       FROM financial_transactions f
       LEFT JOIN units u ON f.unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
@@ -101,9 +100,9 @@ export class FinancialDAO {
     if (condominiumId) {
       const cId = parseInt(condominiumId, 10);
       if (cId === 1) {
-        sql += ' AND (f.condominium_id = 1 OR (f.condominium_id IS NULL AND (b.condominium_id = 1 OR u.block_id IS NULL)))';
+        sql += ' AND (f.condominium_id = 1 OR f.condominium_id IS NULL OR b.condominium_id = 1 OR u.block_id IS NULL)';
       } else {
-        sql += ' AND (f.condominium_id = ? OR (f.condominium_id IS NULL AND b.condominium_id = ?))';
+        sql += ' AND (f.condominium_id = ? OR b.condominium_id = ?)';
         params.push(cId, cId);
       }
     }

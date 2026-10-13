@@ -18,8 +18,8 @@ export class CondominiumDAO {
   getCondominium(condominiumId) {
     const condominium = this.db.prepare('SELECT * FROM condominiums WHERE id = ?').get(id(condominiumId));
     if (!condominium) return null;
-    return { 
-      ...condominium, 
+    return {
+      ...condominium,
       blocks: this.getBlocks(condominiumId),
       modules: this.getModules(condominiumId)
     };
@@ -29,7 +29,7 @@ export class CondominiumDAO {
     if (!data.name?.trim()) throw new Error('Nome do condomínio é obrigatório.');
     const info = this.db.prepare(`INSERT INTO condominiums (name, cnpj, address, city, state, postal_code, phone)
       VALUES (?, ?, ?, ?, ?, ?, ?)`).run(data.name.trim(), data.cnpj || null, data.address || null, data.city || null, data.state || null, data.postal_code || null, data.phone || null);
-    
+
     const newId = info.lastInsertRowid;
     // Novos condomínios recebem os módulos opcionais explicitamente configurados (desabilitados por padrão ou conforme data.modules)
     const validModules = ['dashboard', 'access', 'deliveries', 'reservations', 'financial', 'market'];
@@ -80,7 +80,7 @@ export class CondominiumDAO {
     if (!condominium) throw new Error('Condomínio não encontrado.');
     if (condominium.status !== 'ACTIVE') throw new Error('Condomínio inativo não aceita novos blocos.');
     if (!data.name?.trim()) throw new Error('Nome do bloco é obrigatório.');
-    
+
     const trimmedName = data.name.trim();
     const existing = this.db.prepare(
       'SELECT id FROM blocks WHERE condominium_id = ? AND LOWER(TRIM(name)) = LOWER(?)'
@@ -106,12 +106,8 @@ export class CondominiumDAO {
       throw new Error(`Já existe outro bloco chamado '${trimmedName}' neste condomínio.`);
     }
 
-    const updateTx = this.db.transaction(() => {
-      const result = this.db.prepare('UPDATE blocks SET name=?, description=? WHERE id=?').run(trimmedName, data.description || null, id(blockId));
-      if (!result.changes) throw new Error('Bloco não encontrado.');
-      this.db.prepare('UPDATE units SET block=? WHERE block_id=?').run(trimmedName, id(blockId));
-    });
-    updateTx();
+    const result = this.db.prepare('UPDATE blocks SET name=?, description=? WHERE id=?').run(trimmedName, data.description || null, id(blockId));
+    if (!result.changes) throw new Error('Bloco não encontrado.');
     return this.getBlock(blockId);
   }
 

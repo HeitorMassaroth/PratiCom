@@ -25,7 +25,7 @@ export class ReservationDAO {
 
   getReservations({ condominiumId, space_id, date } = {}) {
     let sql = `
-      SELECT r.*, s.name as space_name, COALESCE(b.name, u.block) as block, u.number as unit_number, res.name as resident_name
+      SELECT r.*, s.name as space_name, u.block, u.number as unit_number, res.name as resident_name
       FROM reservations r
       LEFT JOIN spaces s ON r.space_id = s.id
       LEFT JOIN units u ON r.unit_id = u.id

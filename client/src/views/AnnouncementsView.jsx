@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Megaphone, 
-  Plus, 
-  Pin, 
-  Trash2, 
-  AlertTriangle, 
-  Calendar, 
-  User, 
-  X, 
+import {
+  Megaphone,
+  Plus,
+  Pin,
+  Trash2,
+  AlertTriangle,
+  Calendar,
+  User,
+  X,
   Tag,
   CheckCircle,
   Bell
@@ -73,7 +73,6 @@ export default function AnnouncementsView({ showToast }) {
         expires_at: ''
       });
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao publicar comunicado.', 'danger');
     }
@@ -85,7 +84,6 @@ export default function AnnouncementsView({ showToast }) {
       await api.deleteAnnouncement(id);
       showToast('Comunicado excluído do mural.', 'info');
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao excluir comunicado.', 'danger');
     }
@@ -96,8 +94,8 @@ export default function AnnouncementsView({ showToast }) {
       {/* Barra de Ações Superior */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <select 
-            className="form-control" 
+          <select
+            className="form-control"
             style={{ width: '180px' }}
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
@@ -110,8 +108,8 @@ export default function AnnouncementsView({ showToast }) {
             <option value="Lazer">Lazer</option>
           </select>
 
-          <select 
-            className="form-control" 
+          <select
+            className="form-control"
             style={{ width: '180px' }}
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
@@ -142,8 +140,8 @@ export default function AnnouncementsView({ showToast }) {
             const isUrgent = ann.priority === 'urgent' || ann.priority === 'high';
 
             return (
-              <div 
-                key={ann.id} 
+              <div
+                key={ann.id}
                 className="card"
                 style={{
                   borderLeft: isUrgent ? '5px solid var(--accent-danger)' : ann.is_pinned ? '5px solid var(--accent-primary)' : '1px solid var(--border-color)',
@@ -157,10 +155,9 @@ export default function AnnouncementsView({ showToast }) {
                         <Pin size={12} /> Fixado
                       </span>
                     )}
-                    <span className={`badge ${
-                      ann.priority === 'urgent' ? 'badge-danger' :
-                      ann.priority === 'high' ? 'badge-warning' : 'badge-info'
-                    }`}>
+                    <span className={`badge ${ann.priority === 'urgent' ? 'badge-danger' :
+                        ann.priority === 'high' ? 'badge-warning' : 'badge-info'
+                      }`}>
                       Prioridade: {ann.priority}
                     </span>
                     <span className="badge badge-success">
@@ -175,7 +172,7 @@ export default function AnnouncementsView({ showToast }) {
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
                       {new Date(ann.created_at).toLocaleDateString('pt-BR')} às {new Date(ann.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    <button 
+                    <button
                       style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
                       title="Excluir aviso"
                       onClick={() => handleDelete(ann.id, ann.title)}
@@ -226,11 +223,11 @@ export default function AnnouncementsView({ showToast }) {
               <div className="modal-body">
                 <div className="form-group">
                   <label>Título do Comunicado *</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    required 
-                    placeholder="Ex: Interrupção Temporária de Água para Manutenção" 
+                  <input
+                    type="text"
+                    className="form-control"
+                    required
+                    placeholder="Ex: Interrupção Temporária de Água para Manutenção"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   />
@@ -239,7 +236,7 @@ export default function AnnouncementsView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Categoria *</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -254,7 +251,7 @@ export default function AnnouncementsView({ showToast }) {
 
                   <div className="form-group">
                     <label>Nível de Prioridade *</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.priority}
                       onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
@@ -269,10 +266,10 @@ export default function AnnouncementsView({ showToast }) {
 
                 <div className="form-group">
                   <label>Mensagem / Conteúdo Completo *</label>
-                  <textarea 
-                    className="form-control" 
-                    rows="4" 
-                    required 
+                  <textarea
+                    className="form-control"
+                    rows="4"
+                    required
                     placeholder="Escreva a mensagem clara com datas, horários e orientações aos condôminos..."
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
@@ -282,7 +279,7 @@ export default function AnnouncementsView({ showToast }) {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Destinatários</label>
-                    <select 
+                    <select
                       className="form-control"
                       value={formData.target_block}
                       onChange={(e) => setFormData({ ...formData, target_block: e.target.value })}
@@ -295,9 +292,9 @@ export default function AnnouncementsView({ showToast }) {
 
                   <div className="form-group">
                     <label>Válido Até (Opcional)</label>
-                    <input 
-                      type="date" 
-                      className="form-control" 
+                    <input
+                      type="date"
+                      className="form-control"
                       value={formData.expires_at}
                       onChange={(e) => setFormData({ ...formData, expires_at: e.target.value })}
                     />
@@ -305,8 +302,8 @@ export default function AnnouncementsView({ showToast }) {
                 </div>
 
                 <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     id="is_pinned"
                     checked={formData.is_pinned}
                     onChange={(e) => setFormData({ ...formData, is_pinned: e.target.checked })}

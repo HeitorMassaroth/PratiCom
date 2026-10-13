@@ -70,11 +70,9 @@ export default function App() {
     }
   };
 
-  const [activeCondo, setActiveCondo] = useState(null);
   const [condoRefreshKey, setCondoRefreshKey] = useState(Date.now());
 
-  const handleCondoChange = (condo) => {
-    if (condo) setActiveCondo(condo);
+  const handleCondoChange = () => {
     loadCondoModules();
     loadDashboardMetrics();
     setCondoRefreshKey(Date.now());
@@ -91,28 +89,26 @@ export default function App() {
       loadDashboardMetrics();
     };
     window.addEventListener('condo-modules-changed', onModulesChanged);
-    window.addEventListener('dashboard-refresh', loadDashboardMetrics);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('condo-modules-changed', onModulesChanged);
-      window.removeEventListener('dashboard-refresh', loadDashboardMetrics);
     };
   }, []);
 
   return (
     <div className="app-container">
       {/* Barra Lateral */}
-      <Sidebar 
-        currentView={currentView} 
-        setCurrentView={setCurrentView} 
+      <Sidebar
+        currentView={currentView}
+        setCurrentView={setCurrentView}
         stats={dashboardData?.metrics}
         availableModules={availableModules}
       />
 
       {/* Área Principal */}
       <div className="main-wrapper">
-        <Header 
+        <Header
           currentView={currentView}
           setCurrentView={setCurrentView}
           theme={theme}
@@ -127,11 +123,10 @@ export default function App() {
 
         <main className="content-body" key={condoRefreshKey}>
           {currentView === 'dashboard' && (
-            <DashboardView 
-              data={dashboardData} 
+            <DashboardView
+              data={dashboardData}
               setCurrentView={setCurrentView}
               onRefresh={loadDashboardMetrics}
-              activeCondo={activeCondo}
             />
           )}
 
@@ -170,23 +165,23 @@ export default function App() {
       {/* Sistema Global de Notificações Toast */}
       <div className="toast-container">
         {toasts.map((toast) => (
-          <div 
-            key={toast.id} 
+          <div
+            key={toast.id}
             className="toast"
             style={{
               borderLeft: toast.type === 'success' ? '4px solid var(--accent-success)' :
-                          toast.type === 'danger' ? '4px solid var(--accent-danger)' :
-                          toast.type === 'warning' ? '4px solid var(--accent-warning)' : '4px solid var(--accent-primary)'
+                toast.type === 'danger' ? '4px solid var(--accent-danger)' :
+                  toast.type === 'warning' ? '4px solid var(--accent-warning)' : '4px solid var(--accent-primary)'
             }}
           >
             {toast.type === 'success' && <CheckCircle2 size={18} color="var(--accent-success)" />}
             {toast.type === 'danger' && <AlertTriangle size={18} color="var(--accent-danger)" />}
             {toast.type === 'warning' && <AlertTriangle size={18} color="var(--accent-warning)" />}
             {toast.type === 'info' && <Info size={18} color="var(--accent-primary)" />}
-            
+
             <div style={{ flex: 1 }}>{toast.message}</div>
-            
-            <button 
+
+            <button
               style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
               onClick={() => removeToast(toast.id)}
             >

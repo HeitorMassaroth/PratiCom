@@ -1,27 +1,26 @@
 import React from 'react';
-import { 
-  Package, 
-  DollarSign, 
-  ShieldCheck, 
-  Users, 
-  CalendarDays, 
-  AlertTriangle, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  CheckCircle2, 
+import {
+  Package,
+  DollarSign,
+  ShieldCheck,
+  Users,
+  CalendarDays,
+  AlertTriangle,
+  ArrowUpRight,
+  ArrowDownRight,
+  CheckCircle2,
   Clock,
   Sparkles,
   ChevronRight,
   ShoppingCart
 } from 'lucide-react';
 
-export default function DashboardView({ data, setCurrentView, onRefresh, activeCondo }) {
+export default function DashboardView({ data, setCurrentView, onRefresh }) {
   const metrics = data?.metrics || {};
   const recentAccess = data?.recentAccess || [];
   const recentDeliveries = data?.recentDeliveries || [];
   const urgentAnnouncements = data?.urgentAnnouncements || [];
   const upcomingReservations = data?.upcomingReservations || [];
-  const condoName = data?.condominium?.name || activeCondo?.name || 'Condomínio Ativo';
 
   return (
     <div>
@@ -30,7 +29,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh, activeC
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
             <span className="badge badge-success"><Sparkles size={13} /> Sistema Ativo</span>
-            <span className="welcome-banner-condo">{condoName}</span>
+            <span className="welcome-banner-condo">Condomínio Residencial Parque das Flores</span>
           </div>
           <h2 className="welcome-banner-title">
             Bem-vindo(a) ao PratiCom!
@@ -69,10 +68,10 @@ export default function DashboardView({ data, setCurrentView, onRefresh, activeC
           <div className="metric-info">
             <h4>Saldo em Caixa</h4>
             <div className="value" style={{ color: 'var(--accent-mint-text)' }}>
-              R$ {(metrics.balance ?? metrics.currentBalance ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {(metrics.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <div className="subtext">
-              {metrics.overdueCount > 0 ? `${metrics.overdueCount} unidade(s) em atraso` : 'Taxas em dia'}
+              {metrics.overdueCount > 0 ? `${metrics.overdueCount} unidades em atraso` : 'Taxas em dia'}
             </div>
           </div>
         </div>
@@ -105,15 +104,11 @@ export default function DashboardView({ data, setCurrentView, onRefresh, activeC
           </div>
           <div className="metric-info">
             <h4>Estoque do Mercadinho</h4>
-            <div className="value" style={{ color: (metrics.criticalStockItems || metrics.lowStockItems) > 0 ? 'var(--accent-danger-text)' : 'inherit' }}>
-              {metrics.criticalStockItems ?? metrics.lowStockItems ?? 0}
+            <div className="value" style={{ color: metrics.lowStockItems > 0 ? 'var(--accent-danger-text)' : 'inherit' }}>
+              {metrics.lowStockItems ?? 0}
             </div>
             <div className="subtext">
-              {metrics.outOfStockItems > 0 
-                ? `${metrics.outOfStockItems} em falta • ${metrics.lowStockOnlyItems || 0} abaixo do mín.` 
-                : metrics.lowStockItems > 0 
-                  ? `${metrics.lowStockItems} item(ns) abaixo do estoque mínimo` 
-                  : (metrics.totalMarketProducts > 0 ? `Estoque abastecido (${metrics.totalMarketProducts} itens)` : 'Estoque abastecido')}
+              {metrics.lowStockItems > 0 ? 'Itens abaixo do estoque mínimo' : 'Estoque abastecido'}
             </div>
           </div>
         </div>
@@ -168,7 +163,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh, activeC
                         <td>{log.block ? `${log.block} - Apto ${log.unit_number}` : 'Área Geral'}</td>
                         <td>{new Date(log.entered_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td>
                         <td>
-                          {['inside', 'IN_PROPERTY'].includes(log.status) ? (
+                          {log.status === 'inside' ? (
                             <span className="badge badge-warning">No Condomínio</span>
                           ) : (
                             <span className="badge badge-success">Saiu</span>
@@ -212,11 +207,11 @@ export default function DashboardView({ data, setCurrentView, onRefresh, activeC
                       <td>{pkg.resident_name || 'Morador'}</td>
                       <td>{pkg.courier}</td>
                       <td>
-                        <span style={{ 
-                          fontFamily: 'monospace', 
-                          fontWeight: '700', 
-                          background: 'rgba(59, 130, 246, 0.15)', 
-                          padding: '3px 8px', 
+                        <span style={{
+                          fontFamily: 'monospace',
+                          fontWeight: '700',
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          padding: '3px 8px',
                           borderRadius: '4px',
                           color: '#60a5fa'
                         }}>
@@ -321,7 +316,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh, activeC
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div className="badge badge-warning" style={{ fontSize: '0.75rem' }}>
-                        {res.reservation_date ? res.reservation_date.split('-').reverse().join('/') : ''}
+                        {res.reservation_date}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '2px' }}>
                         {res.start_time} às {res.end_time} (1h)

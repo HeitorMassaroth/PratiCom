@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  CalendarDays, 
-  Clock, 
-  AlertCircle, 
-  CheckCircle2, 
-  X, 
-  Utensils, 
-  PartyPopper, 
-  Trophy, 
-  Dumbbell, 
-  Briefcase, 
+import {
+  CalendarDays,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  X,
+  Utensils,
+  PartyPopper,
+  Trophy,
+  Dumbbell,
+  Briefcase,
   Flame,
   Plus,
   Ban,
@@ -142,7 +142,6 @@ export default function ReservationsView({ showToast }) {
       setNotesInput('');
       setGuestsCount(0);
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao criar reserva.', 'danger');
     }
@@ -154,7 +153,6 @@ export default function ReservationsView({ showToast }) {
       await api.cancelReservation(id);
       showToast('Reserva cancelada com sucesso.', 'info');
       loadData();
-      window.dispatchEvent(new Event('dashboard-refresh'));
     } catch (err) {
       showToast(err.message || 'Erro ao cancelar reserva.', 'danger');
     }
@@ -191,9 +189,9 @@ export default function ReservationsView({ showToast }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: '600' }}>Data:</label>
-          <input 
-            type="date" 
-            className="form-control" 
+          <input
+            type="date"
+            className="form-control"
             style={{ width: '170px' }}
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
@@ -213,7 +211,7 @@ export default function ReservationsView({ showToast }) {
           const IconComp = iconMap[space.icon] || CalendarDays;
 
           return (
-            <div 
+            <div
               key={space.id}
               onClick={() => setSelectedSpaceId(space.id)}
               style={{
@@ -228,10 +226,10 @@ export default function ReservationsView({ showToast }) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                <div style={{ 
-                  width: '40px', 
-                  height: '40px', 
-                  borderRadius: '10px', 
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
                   background: isSelected ? 'rgba(255, 255, 255, 0.2)' : 'rgba(59, 130, 246, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
@@ -369,7 +367,7 @@ export default function ReservationsView({ showToast }) {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {res.status === 'Confirmada' && (
-                        <button 
+                        <button
                           className="btn btn-secondary btn-sm"
                           style={{ color: '#ef4444' }}
                           onClick={() => handleCancelReservation(res.id, res.space_name, res.start_time)}
@@ -420,7 +418,7 @@ export default function ReservationsView({ showToast }) {
 
                 <div className="form-group">
                   <label>Apartamento / Unidade *</label>
-                  <select 
+                  <select
                     className="form-control"
                     required
                     value={unitIdInput}
@@ -436,7 +434,7 @@ export default function ReservationsView({ showToast }) {
                 {unitIdInput && (
                   <div className="form-group">
                     <label>Morador Responsável *</label>
-                    <select 
+                    <select
                       className="form-control"
                       required
                       value={residentIdInput}
@@ -452,9 +450,9 @@ export default function ReservationsView({ showToast }) {
 
                 <div className="form-group">
                   <label>Número Estimado de Convidados (Capacidade máxima: {activeSpace.capacity})</label>
-                  <input 
-                    type="number" 
-                    className="form-control" 
+                  <input
+                    type="number"
+                    className="form-control"
                     min="0"
                     max={activeSpace.capacity}
                     value={guestsCount}
@@ -464,9 +462,9 @@ export default function ReservationsView({ showToast }) {
 
                 <div className="form-group">
                   <label>Finalidade / Observações</label>
-                  <textarea 
-                    className="form-control" 
-                    rows="2" 
+                  <textarea
+                    className="form-control"
+                    rows="2"
                     placeholder="Ex: Treino particular, almoço de família..."
                     value={notesInput}
                     onChange={(e) => setNotesInput(e.target.value)}
