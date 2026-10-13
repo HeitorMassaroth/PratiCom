@@ -24,7 +24,7 @@ export class DeliveryDAO {
   getDeliveries({ condominiumId, status, unit_id } = {}) {
     const scope = this.tenantScope(condominiumId);
     let sql = `
-      SELECT d.*, u.block, u.number as unit_number, r.name as resident_name, b.condominium_id
+      SELECT d.*, u.block, u.number as unit_number, r.name as resident_name
       FROM deliveries d
       LEFT JOIN units u ON d.unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
@@ -34,17 +34,8 @@ export class DeliveryDAO {
     const params = [...scope.params];
 
     if (status) {
-      const s = String(status).toUpperCase();
-      if (s === 'PENDING' || s === 'RECEBIDA') {
-        sql += " AND UPPER(d.status) IN ('PENDING', 'RECEBIDA')";
-      } else if (s === 'DELIVERED' || s === 'PICKED_UP' || s === 'ENTREGUE') {
-        sql += " AND UPPER(d.status) IN ('DELIVERED', 'PICKED_UP', 'ENTREGUE')";
-      } else if (s === 'CANCELLED' || s === 'CANCELADA') {
-        sql += " AND UPPER(d.status) IN ('CANCELLED', 'CANCELADA')";
-      } else {
-        sql += " AND UPPER(d.status) = ?";
-        params.push(s);
-      }
+      sql += ' AND d.status = ?';
+      params.push(status);
     }
 
     if (unit_id) {
@@ -52,7 +43,7 @@ export class DeliveryDAO {
       params.push(parseInt(unit_id, 10));
     }
 
-    sql += ' ORDER BY d.received_at DESC, d.id DESC';
+    sql += ' ORDER BY d.received_at DESC';
     return this.db.prepare(sql).all(params);
   }
 
@@ -106,9 +97,7 @@ export class DeliveryDAO {
       data.tracking_code || null,
       data.description || '',
       pickupCode,
-      data.notes || '',
-      data.received_by || 'Portaria',
-      data.registered_by || 'Portaria'
+      data.notes || ''
     );
 
     const delivery = this.getDelivery(info.lastInsertRowid);
@@ -130,7 +119,7 @@ export class DeliveryDAO {
   updateDelivery(id, data, condominiumId) {
     const delivery = this.getDelivery(id, condominiumId);
     if (!delivery) {
-      throw new Error('Encomenda não encontrada ou não pertence a este condomínio.');
+      throw new Error('Encomenda não encontrada.');
     }
 
     if (delivery.status === 'delivered') {
@@ -178,10 +167,6 @@ export class DeliveryDAO {
       throw new Error('Esta encomenda já foi retirada.');
     }
 
-    if (upperStatus === 'CANCELLED' || upperStatus === 'CANCELADA') {
-      throw new Error('Não é possível dar baixa em uma encomenda cancelada.');
-    }
-
     if (pickup_code && delivery.pickup_code !== String(pickup_code).trim()) {
       throw new Error('Código de retirada (PIN) incorreto.');
     }
@@ -196,4 +181,3 @@ export class DeliveryDAO {
     return this.getDelivery(delivery.id);
   }
 }
-
