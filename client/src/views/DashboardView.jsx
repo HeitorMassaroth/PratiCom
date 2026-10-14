@@ -170,7 +170,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
                         <td>{log.block ? `${log.block} - Apto ${log.unit_number}` : 'Área Geral'}</td>
                         <td>{formatTime(log.entered_at || log.entry_time)}</td>
                         <td>
-                          {log.status === 'inside' ? (
+                          {(log.status === 'IN_PROPERTY' || log.status === 'inside') ? (
                             <span className="badge badge-warning">No Condomínio</span>
                           ) : (
                             <span className="badge badge-success">Saiu</span>

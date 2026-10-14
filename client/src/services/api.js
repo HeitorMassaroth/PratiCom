@@ -71,7 +71,6 @@ export const api = {
   deleteDelivery: (id) => request(`/deliveries/${id}`, { method: 'DELETE' }),
   pickupDelivery: (id, data) => request(`/deliveries/${id}/pickup`, { method: 'PATCH', body: JSON.stringify(data) }),
   cancelDelivery: (id, data) => request(`/deliveries/${id}/cancel`, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteDelivery: (id) => request(`/deliveries/${id}`, { method: 'DELETE' }),
 
   // Portaria / Acesso
   getAccessLogs: (params = {}) => {

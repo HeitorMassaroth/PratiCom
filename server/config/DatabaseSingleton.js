@@ -176,4 +176,6 @@ class DatabaseSingleton {
 const instance = new DatabaseSingleton();
 Object.freeze(instance);
 
+export const db = instance.getDb();
+export { DatabaseSingleton };
 export default instance;

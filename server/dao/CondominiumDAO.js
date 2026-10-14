@@ -1,9 +1,11 @@
-import DatabaseSingleton from '../config/DatabaseSingleton.js';
+import { AbstractTenantDAO } from './AbstractTenantDAO.js';
 
 const id = (value) => Number.parseInt(value, 10);
 
-export class CondominiumDAO {
-  constructor() { this.db = DatabaseSingleton.getDb(); }
+export class CondominiumDAO extends AbstractTenantDAO {
+  constructor() {
+    super();
+  }
 
   getCondominiums({ status } = {}) {
     let sql = `SELECT c.*, COUNT(DISTINCT b.id) AS blocks_count, COUNT(DISTINCT u.id) AS units_count

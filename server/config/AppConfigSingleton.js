@@ -60,4 +60,6 @@ class AppConfigSingleton {
 const instance = new AppConfigSingleton();
 Object.freeze(instance);
 
+export const appConfig = instance;
+export { AppConfigSingleton };
 export default instance;

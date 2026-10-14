@@ -1,0 +1,362 @@
+================================================================================
+                    PRATICOM ERP - ARQUITETURA GOF E CATÁLOGO DE CRUDS
+================================================================================
+
+Este documento descreve detalhadamente os padrões de projeto da Gang of Four (GoF)
+implementados no sistema, suas funções de engenharia, os arquivos onde estão
+localizados e o catálogo completo de todos os CRUDs desenvolvidos.
+
+================================================================================
+1. PADRÕES DE PROJETO GOF UTILIZADOS
+================================================================================
+
+--------------------------------------------------------------------------------
+A. PADRÃO SINGLETON (2 Exemplos de Inserção Direta)
+--------------------------------------------------------------------------------
+
+1. DatabaseSingleton
+   - Arquivo: server/config/DatabaseSingleton.js
+   - Função: 
+     Garante que exista uma única instância ativa de conexão com o banco de dados
+     relacional SQLite (better-sqlite3) em todo o ciclo de vida do backend.
+     Configura imediatamente o comando 'PRAGMA foreign_keys = ON' para garantir
+     a integridade referencial e previne a criação de múltiplas instâncias ou
+     vazamentos de descritores de arquivo (file descriptors).
+     Exporta a instância protegida por Object.freeze e disponibiliza o objeto
+     diretamente via 'export const db = instance.getDb()'.
+
+2. AppConfigSingleton
+   - Arquivo: server/config/AppConfigSingleton.js
+   - Função:
+     Centraliza a leitura, validação e acesso imutável a todas as variáveis de
+     ambiente e parametrizações globais do sistema (portas de rede, ambiente de
+     execução, chaves da Linha de Produtos de Software - LPS).
+     Protegido com Object.freeze para impedir modificações dinâmicas indevidas em
+     tempo de execução. Exporta a instância diretamente via 'export const appConfig = instance'.
+
+--------------------------------------------------------------------------------
+B. PADRÃO TEMPLATE METHOD (6 Implementações com Foco em Reuso Sistemático)
+--------------------------------------------------------------------------------
+
+1. AbstractTenantDAO (Template de Persistência Multi-Tenant)
+   - Arquivo: server/dao/AbstractTenantDAO.js
+   - Função:
+     Classe base abstrata herdada por todos os DAOs do sistema. Define o algoritmo
+     invariante de identificação e aplicação de escopo multi-tenant em consultas
+     SQL, garantindo que nenhum condomínio acesse dados de outro.
+     Implementa os métodos de gabarito 'resolveCondominiumId()', 'unitTenantScope()'
+     e 'directTenantScope()'.
+   - Arquivos que herdam este Template (Subclasses):
+     * server/dao/ResidentDAO.js
+     * server/dao/DeliveryDAO.js
+     * server/dao/FinancialDAO.js
+     * server/dao/AccessDAO.js
+     * server/dao/AnnouncementDAO.js
+     * server/dao/MarketDAO.js
+     * server/dao/ReservationDAO.js
+     * server/dao/CondominiumDAO.js
+
+2. BusinessValidatorTemplate (Template de Validação de Regras de Negócio)
+   - Arquivo: server/services/templates/BusinessValidatorTemplate.js
+   - Função:
+     Define a sequência invariante de passos para validação de regras de negócio:
+     (1) checkRequiredFields -> (2) checkTemporalConstraints -> 
+     (3) checkUniquenessAndConflicts -> (4) checkRelationalIntegrity.
+     As subclasses implementam os passos específicos, garantindo que o fluxo de
+     validação siga sempre a mesma ordem em todo o sistema.
+   - Subclasse Implementada:
+     * ReservationConflictValidator (validação de sobreposição de horários de reservas)
+   - Arquivos de uso:
+     * server/dao/ReservationDAO.js
+     * server/services/templates/EntityOperationTemplate.js
+
+3. EntityOperationTemplate (Template de Ciclo de Vida de Operações)
+   - Arquivo: server/services/templates/EntityOperationTemplate.js
+   - Função:
+     Estrutura o algoritmo invariante de execução de operações de domínio:
+     (1) validate() -> (2) assertTenantScope() -> (3) executePersist() -> (4) triggerSideEffects().
+     Centraliza a captura de erros, o isolamento multi-tenant e a emissão de
+     efeitos colaterais (notificações, geração de PINs, etc.).
+   - Subclasses Implementadas:
+     * CreateResidentOperation: Valida unidade, escopo e persiste novo morador.
+     * CreateReservationOperation: Valida conflitos de horário e agenda espaço comum.
+     * CreateDeliveryOperation: Gera PIN aleatório, persiste pacote e dispara alerta.
+   - Arquivos de uso:
+     * server/dao/ResidentDAO.js
+     * server/dao/ReservationDAO.js
+     * server/dao/DeliveryDAO.js
+
+4. PaymentTemplate (Template de Processamento Financeiro)
+   - Arquivo: server/services/templates/PaymentTemplate.js
+   - Função:
+     Esqueleto de execução para transações financeiras:
+     (1) validateAmount() -> (2) assertAccountStatus() -> (3) processTransfer() -> (4) generateReceipt().
+     Garante que qualquer meio de pagamento realize as checagens e emita comprovante
+     padronizado.
+   - Subclasses Implementadas:
+     * PixPaymentProcessor (pagamento instantâneo via Pix com QR Code)
+     * CondoFeePaymentProcessor (débito em cota condominial mensal)
+     * CardPaymentProcessor (pagamento via cartão no PDV)
+   - Arquivo de uso:
+     * server/services/factories/PaymentProcessorFactory.js
+
+5. NotificationTemplate (Template de Mensageria e Comunicação)
+   - Arquivo: server/services/templates/NotificationTemplate.js
+   - Função:
+     Padroniza o envio de alertas e comunicados:
+     (1) formatHeader() -> (2) formatBody() -> (3) resolveAudience() -> (4) sendNotification().
+   - Subclasses Implementadas:
+     * DeliveryNotificationDispatcher (notificação de encomenda recebida ao morador da unidade)
+     * AnnouncementNotificationDispatcher (envio de comunicado geral ou urgente no mural)
+   - Arquivo de uso:
+     * server/services/factories/NotificationDispatcherFactory.js
+     * server/dao/DeliveryDAO.js
+     * server/dao/OperationsDAO.js
+
+6. ReportTemplate (Template de Consolidação e Relatórios)
+   - Arquivo: server/services/templates/ReportTemplate.js
+   - Função:
+     Algoritmo esqueleto para extração de dados e prestação de contas:
+     (1) fetchRawData() -> (2) aggregateMetrics() -> (3) formatOutput().
+   - Subclasse Implementada:
+     * FinancialBalanceReport (balancete financeiro e fluxo de caixa do condomínio)
+
+--------------------------------------------------------------------------------
+C. PADRÃO FACTORY METHOD (3 Fábricas Centrais do Sistema)
+--------------------------------------------------------------------------------
+
+1. DAOFactory
+   - Arquivo: server/dao/DAOFactory.js
+   - Função:
+     Fábrica centralizada que mapeia, instancia e disponibiliza todos os DAOs
+     da aplicação sob demanda ('resident', 'delivery', 'financial', 'access',
+     'announcement', 'market', 'reservation', 'condominium'). Elimina acoplamento
+     direto entre as rotas de API e as implementações concretas dos DAOs.
+   - Arquivo de uso:
+     * server/server.js
+
+2. PaymentProcessorFactory
+   - Arquivo: server/services/factories/PaymentProcessorFactory.js
+   - Função:
+     Instancia dinamicamente a estratégia de pagamento polimórfica com base no canal
+     de pagamento selecionado no checkout do ponto de venda ('PIX', 'BOLETO_CONDO',
+     'CREDIT_CARD'). Permite estender novos métodos de pagamento sem modificar o código do PDV.
+   - Arquivo de uso:
+     * server/dao/MarketDAO.js (método checkoutSale)
+
+3. NotificationDispatcherFactory
+   - Arquivo: server/services/factories/NotificationDispatcherFactory.js
+   - Função:
+     Fabrica despachantes de notificação especializados de acordo com o evento de
+     domínio gerado ('DELIVERY' para encomendas ou 'ANNOUNCEMENT' para avisos do mural),
+     permitindo que os DAOs disparem notificações sem acoplamento concreto com o meio de envio.
+   - Arquivos de uso:
+     * server/dao/DeliveryDAO.js
+     * server/dao/OperationsDAO.js
+
+
+================================================================================
+2. CATÁLOGO COMPLETO DE CRUDS DO SISTEMA
+================================================================================
+
+O sistema possui 12 CRUDs canônicos completos (Create, Read, Update, Delete) e
+3 fluxos relacionais de persistência adicionais. Todos operam 100% integrados
+ao SQLite relacional sob isolamento multi-tenant.
+
+--------------------------------------------------------------------------------
+1. CRUD DE CONDOMÍNIOS
+--------------------------------------------------------------------------------
+- Tabela SQLite: condominiums
+- Arquivo: server/dao/CondominiumDAO.js
+- Rotas:
+  * POST /api/condominiums (Create)
+  * GET /api/condominiums, GET /api/condominiums/:id (Read)
+  * PUT /api/condominiums/:id (Update)
+  * DELETE /api/condominiums/:id (Delete)
+- Função:
+  Gerencia os condomínios cadastrados (tenant raiz), incluindo nome, endereço,
+  CNPJ e parâmetros de contato.
+
+--------------------------------------------------------------------------------
+2. CRUD DE BLOCOS / TORRES
+--------------------------------------------------------------------------------
+- Tabela SQLite: blocks
+- Arquivo: server/dao/CondominiumDAO.js
+- Rotas:
+  * POST /api/blocks (Create)
+  * GET /api/blocks, GET /api/condominiums/:id/blocks (Read)
+  * PUT /api/blocks/:id (Update)
+  * DELETE /api/blocks/:id (Delete)
+- Função:
+  Gerencia os blocos/torres pertencentes a cada condomínio, com validação de
+  unicidade de nome por condomínio (bloqueia duplicações).
+
+--------------------------------------------------------------------------------
+3. CRUD DE UNIDADES (APARTAMENTOS)
+--------------------------------------------------------------------------------
+- Tabela SQLite: units
+- Arquivo: server/dao/CondominiumDAO.js
+- Rotas:
+  * POST /api/units (Create)
+  * GET /api/units, GET /api/units/:id (Read)
+  * PUT /api/units/:id (Update)
+  * DELETE /api/units/:id (Delete)
+- Função:
+  Gerencia os apartamentos/casas vinculados aos blocos, garantindo unicidade
+  do número da unidade dentro do mesmo bloco e vinculação ao condomínio.
+
+--------------------------------------------------------------------------------
+4. CRUD DE MORADORES / PESSOAS
+--------------------------------------------------------------------------------
+- Tabela SQLite: residents
+- Arquivo: server/dao/ResidentDAO.js (opera com CreateResidentOperation)
+- Rotas:
+  * POST /api/residents (Create)
+  * GET /api/residents, GET /api/residents/:id (Read)
+  * PUT /api/residents/:id (Update)
+  * DELETE /api/residents/:id (Delete)
+- Função:
+  Cadastro completo de pessoas residentes, tipo de ocupação (proprietário,
+  inquilino, dependente), contatos, e-mail e vínculo com a unidade habitacional.
+
+--------------------------------------------------------------------------------
+5. CRUD DE VEÍCULOS
+--------------------------------------------------------------------------------
+- Tabela SQLite: vehicles
+- Arquivo: server/dao/ResidentDAO.js
+- Rotas:
+  * POST /api/vehicles (Create)
+  * GET /api/vehicles, GET /api/vehicles/:id (Read)
+  * PATCH /api/vehicles/:id (Update)
+  * DELETE /api/vehicles/:id (Delete)
+- Função:
+  Gerencia os veículos vinculados às unidades dos moradores. Executa normalização
+  de placa em maiúsculo (uppercase), validação de unidade e proteção cross-tenant.
+
+--------------------------------------------------------------------------------
+6. CRUD DE ENCOMENDAS (DELIVERIES)
+--------------------------------------------------------------------------------
+- Tabela SQLite: deliveries
+- Arquivo: server/dao/DeliveryDAO.js (opera com CreateDeliveryOperation e NotificationDispatcherFactory)
+- Rotas:
+  * POST /api/deliveries (Create)
+  * GET /api/deliveries, GET /api/deliveries/:id (Read)
+  * PUT /api/deliveries/:id, POST /api/deliveries/:id/deliver (Update / Baixa por PIN)
+  * DELETE /api/deliveries/:id (Delete)
+- Função:
+  Recebimento de encomendas na portaria, geração automática de PIN de 4 dígitos,
+  disparo de notificação para a unidade, baixa segura por PIN e cancelamento motivado.
+
+--------------------------------------------------------------------------------
+7. CRUD DE CONTROLE DE ACESSO (PORTARIA)
+--------------------------------------------------------------------------------
+- Tabela SQLite: access_logs
+- Arquivo: server/dao/AccessDAO.js
+- Rotas:
+  * POST /api/access/entry (Create)
+  * GET /api/access, GET /api/access/active (Read)
+  * POST /api/access/exit/:id (Update - Registro de saída)
+  * DELETE /api/access/:id (Delete)
+- Função:
+  Monitoramento em tempo real de entrada e saída de visitantes, prestadores de
+  serviço e prestadores, com controle de status (IN_PROPERTY / EXITED) e histórico.
+
+--------------------------------------------------------------------------------
+8. CRUD DE ESPAÇOS / ÁREAS COMUNS
+--------------------------------------------------------------------------------
+- Tabela SQLite: spaces
+- Arquivo: server/dao/ReservationDAO.js
+- Rotas:
+  * POST /api/spaces (Create)
+  * GET /api/spaces, GET /api/spaces/:id (Read)
+  * PUT /api/spaces/:id (Update)
+  * DELETE /api/spaces/:id (Delete)
+- Função:
+  Cadastramento de áreas sociais reserváveis (salão de festas, churrasqueira,
+  quadra poliesportiva, espaço gourmet), capacidade máxima e regras de uso.
+
+--------------------------------------------------------------------------------
+9. CRUD DE RESERVAS DE ESPAÇOS
+--------------------------------------------------------------------------------
+- Tabela SQLite: reservations
+- Arquivo: server/dao/ReservationDAO.js (opera com ReservationConflictValidator e CreateReservationOperation)
+- Rotas:
+  * POST /api/reservations (Create)
+  * GET /api/reservations, GET /api/reservations/:id (Read)
+  * PUT /api/reservations/:id, PATCH /api/reservations/:id/cancel (Update / Cancelamento)
+  * DELETE /api/reservations/:id (Delete)
+- Função:
+  Agendamento de reservas para os moradores. Executa validação de regras de
+  negócio com bloqueio estrito contra sobreposição de horários e datas.
+
+--------------------------------------------------------------------------------
+10. CRUD DE TRANSAÇÕES FINANCEIRAS
+--------------------------------------------------------------------------------
+- Tabela SQLite: financial_transactions
+- Arquivo: server/dao/FinancialDAO.js
+- Rotas:
+  * POST /api/financial/transactions (Create)
+  * GET /api/financial/transactions, GET /api/financial/summary (Read)
+  * PUT /api/financial/transactions/:id (Update)
+  * DELETE /api/financial/transactions/:id (Delete)
+- Função:
+  Lançamentos contábeis de receitas (taxas condominiais) e despesas (manutenção,
+  água, luz, folha). Calcula o resumo financeiro consolidado por condomínio.
+
+--------------------------------------------------------------------------------
+11. CRUD DE MURAL DE AVISOS / COMUNICADOS
+--------------------------------------------------------------------------------
+- Tabela SQLite: announcements
+- Arquivo: server/dao/AnnouncementDAO.js (integrado com NotificationDispatcherFactory)
+- Rotas:
+  * POST /api/announcements (Create)
+  * GET /api/announcements, GET /api/announcements/dashboard (Read)
+  * PUT /api/announcements/:id (Update)
+  * DELETE /api/announcements/:id (Delete)
+- Função:
+  Publicação de avisos para a comunidade. Gerencia avisos normais e avisos
+  urgentes fixados com prioridade visual no topo do dashboard e do mural.
+
+--------------------------------------------------------------------------------
+12. CRUD DE PRODUTOS DO MERCADINHO (HONEST MARKET)
+--------------------------------------------------------------------------------
+- Tabela SQLite: market_products
+- Arquivo: server/dao/MarketDAO.js
+- Rotas:
+  * POST /api/market/products (Create)
+  * GET /api/market/products, GET /api/market/products/:id (Read)
+  * PUT /api/market/products/:id, PATCH /api/market/products/:id/stock (Update)
+  * DELETE /api/market/products/:id (Delete)
+- Função:
+  Gestão do catálogo de produtos disponíveis para autoatendimento no condomínio,
+  preço de venda, código de barras, categoria e controle de estoque.
+
+--------------------------------------------------------------------------------
+FLUXOS RELACIONAIS DE PERSISTÊNCIA ADICIONAIS
+--------------------------------------------------------------------------------
+
+13. Fluxo de Vendas do PDV (Checkout ACID)
+    - Tabelas: market_sales, market_sale_items
+    - Arquivo: server/dao/MarketDAO.js (com PaymentProcessorFactory)
+    - Operações: Create (POST /api/market/checkout), Read (GET /api/market/sales)
+    - Função: Transação atômica de compra com decremento de estoque e processamento polimórfico de pagamento.
+
+14. Fluxo de Módulos Dinâmicos por Condomínio
+    - Tabela: condominium_modules
+    - Arquivo: server/dao/CondominiumDAO.js
+    - Operações: Read (GET /api/condominiums/:id/modules), Update (PUT /api/condominiums/:id/modules)
+    - Função: Ativação e desativação seletiva dos 6 submódulos opcionais por condomínio com isolamento de dados.
+
+15. Fluxo de Feature Flags da LPS (Linha de Produtos de Software)
+    - Tabela: app_features
+    - Arquivo: server/dao/OperationsDAO.js
+    - Operações: Read (GET /api/settings/features), Update (POST /api/settings/features)
+    - Função: Habilitação/desabilitação global de funcionalidades do ERP em tempo de execução.
+
+================================================================================
+3. INDEPENDÊNCIA E DIRETRIZES TÉCNICAS
+================================================================================
+- Persistência: 100% SQLite relacional com chaves estrangeiras ativas.
+- Dependência de JSONs de dados: Zero. Nenhum arquivo .json é utilizado para persistir dados.
+- Arquitetura: Backend RESTful headless e autônomo, totalmente desacoplado da interface gráfica.
+================================================================================

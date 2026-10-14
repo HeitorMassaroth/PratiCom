@@ -1,13 +1,13 @@
-import DatabaseSingleton from '../config/DatabaseSingleton.js';
+import { AbstractTenantDAO } from './AbstractTenantDAO.js';
 import { FinancialReportGenerator } from '../services/templates/ReportTemplate.js';
 
 /**
- * Padrão de Projeto: DAO (Data Access Object - 3/3)
+ * Padrão de Projeto: DAO (Data Access Object) com herança de AbstractTenantDAO
  * Abstração e persistência relacional de dados financeiros condominiais no SQLite.
  */
-export class FinancialDAO {
+export class FinancialDAO extends AbstractTenantDAO {
   constructor() {
-    this.db = DatabaseSingleton.getDb();
+    super();
     this.reportGenerator = new FinancialReportGenerator(this.db);
   }
 
@@ -54,7 +54,10 @@ export class FinancialDAO {
     if (!unit) throw new Error('A unidade informada não pertence ao condomínio ativo.');
   }
 
-  getSummary({ condominiumId } = {}) {
+  getSummary(options = {}) {
+    const condominiumId = (typeof options === 'object' && options !== null)
+      ? options.condominiumId
+      : options;
     const financialScope = condominiumId
       ? this.transactionScope(condominiumId)
       : { sql: '1=1', params: [] };
@@ -111,6 +114,7 @@ export class FinancialDAO {
     `).all(...params);
     const incomePaid = totals?.income_paid || 0;
     const expensePaid = totals?.expense_paid || 0;
+    const currentBalance = incomePaid - expensePaid;
 
     return {
       income: {
@@ -123,7 +127,8 @@ export class FinancialDAO {
         pending: totals?.expense_pending || 0,
         overdue: totals?.expense_overdue || 0
       },
-      currentBalance: incomePaid - expensePaid,
+      currentBalance,
+      total_balance: currentBalance,
       default_rate: parseFloat(defaultRate.toFixed(1)),
       delinquencyByUnit,
       default_amount: totals?.income_overdue || 0,
@@ -169,15 +174,16 @@ export class FinancialDAO {
     return this.db.prepare(sql).all(params);
   }
 
-  createTransaction(data) {
-    this.validateUnit(data.unit_id, data.condominium_id);
+  createTransaction(data, condominiumId) {
+    const cId = data?.condominium_id || condominiumId || null;
+    this.validateUnit(data.unit_id, cId);
     const stmt = this.db.prepare(`
       INSERT INTO financial_transactions (condominium_id, unit_id, description, amount, type, category, status, due_date)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const info = stmt.run(
-      data.condominium_id ? parseInt(data.condominium_id, 10) : null,
+      cId ? parseInt(cId, 10) : null,
       data.unit_id ? parseInt(data.unit_id, 10) : null,
       data.description,
       parseFloat(data.amount),

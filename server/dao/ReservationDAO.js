@@ -1,8 +1,11 @@
-import DatabaseSingleton from '../config/DatabaseSingleton.js';
+import { AbstractTenantDAO } from './AbstractTenantDAO.js';
+import { CreateReservationOperation } from '../services/templates/EntityOperationTemplate.js';
+import { ReservationConflictValidator } from '../services/templates/BusinessValidatorTemplate.js';
 
-export class ReservationDAO {
+export class ReservationDAO extends AbstractTenantDAO {
   constructor() {
-    this.db = DatabaseSingleton.getDb();
+    super();
+    this.validator = new ReservationConflictValidator(this.db);
   }
 
   assertReservationDateIsValid(reservationDate) {
@@ -174,53 +177,7 @@ export class ReservationDAO {
   }
 
   createReservation(data) {
-    const space = this.getSpaceById(data.space_id);
-    if (!space) {
-      throw new Error('Espaço não encontrado.');
-    }
-
-    this.assertReservationDateIsValid(data.reservation_date);
-    this.assertReservationDurationIsOneHour(data.start_time, data.end_time);
-
-    // Checar conflitos de data e hora
-    const conflict = this.db.prepare(`
-      SELECT COUNT(*) as count FROM reservations
-      WHERE space_id = ? AND reservation_date = ? AND status = 'CONFIRMED'
-      AND ((start_time < ? AND end_time > ?) OR (start_time < ? AND end_time > ?))
-    `).get(
-      parseInt(data.space_id, 10),
-      data.reservation_date,
-      data.end_time, data.start_time,
-      data.end_time, data.start_time
-    );
-
-    if (conflict.count > 0) {
-      throw new Error('Já existe uma reserva confirmada para este horário e espaço.');
-    }
-
-    const startHour = parseInt(data.start_time.split(':')[0], 10);
-    const endHour = parseInt(data.end_time.split(':')[0], 10);
-    const hours = Math.max(1, endHour - startHour);
-    const totalPrice = (space.price_per_hour || 0) * hours;
-
-    const stmt = this.db.prepare(`
-      INSERT INTO reservations (space_id, unit_id, resident_id, reservation_date, start_time, end_time, guests_count, notes, total_price, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED')
-    `);
-
-    const info = stmt.run(
-      parseInt(data.space_id, 10),
-      parseInt(data.unit_id, 10),
-      parseInt(data.resident_id, 10),
-      data.reservation_date,
-      data.start_time,
-      data.end_time,
-      parseInt(data.guests_count, 10) || 0,
-      data.notes?.trim() || null,
-      totalPrice
-    );
-
-    return this.getReservationById(info.lastInsertRowid);
+    return new CreateReservationOperation().execute(data);
   }
 
   updateReservation(id, data) {
@@ -243,24 +200,13 @@ export class ReservationDAO {
     const guestsCount = data.guests_count !== undefined ? parseInt(data.guests_count, 10) || 0 : current.guests_count || 0;
     const notes = data.notes !== undefined ? data.notes?.trim() || null : current.notes || null;
 
-    this.assertReservationDateIsValid(reservationDate);
-    this.assertReservationDurationIsOneHour(startTime, endTime);
-
-    const conflict = this.db.prepare(`
-      SELECT COUNT(*) as count FROM reservations
-      WHERE space_id = ? AND reservation_date = ? AND status = 'CONFIRMED' AND id <> ?
-      AND ((start_time < ? AND end_time > ?) OR (start_time < ? AND end_time > ?))
-    `).get(
-      spaceId,
-      reservationDate,
-      parseInt(id, 10),
-      endTime, startTime,
-      endTime, startTime
-    );
-
-    if (conflict.count > 0) {
-      throw new Error('Já existe uma reserva confirmada para este horário e espaço.');
-    }
+    // Validação centralizada via Template Method
+    this.validator.validate({
+      space_id: spaceId,
+      reservation_date: reservationDate,
+      start_time: startTime,
+      end_time: endTime
+    }, { excludeId: parseInt(id, 10) });
 
     const startHour = parseInt(startTime.split(':')[0], 10);
     const endHour = parseInt(endTime.split(':')[0], 10);

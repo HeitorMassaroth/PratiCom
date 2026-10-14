@@ -1,35 +1,26 @@
-import DatabaseSingleton from '../config/DatabaseSingleton.js';
-import { AnnouncementNotificationDispatcher } from '../services/templates/NotificationTemplate.js';
+import { AbstractTenantDAO } from './AbstractTenantDAO.js';
+import { NotificationDispatcherFactory } from '../services/factories/NotificationDispatcherFactory.js';
 
 /**
  * Módulo DAO Consolidado de Operações (Portaria & Mural de Comunicados)
- * Consolida as responsabilidades de acesso a dados de Acesso de Portaria e Comunicados em um único módulo coeso.
+ * Especializado em persistência multi-tenant com herança de AbstractTenantDAO.
  */
 
-export class AccessDAO {
+export class AccessDAO extends AbstractTenantDAO {
   constructor() {
-    this.db = DatabaseSingleton.getDb();
+    super();
   }
 
   getAccessLogs({ condominiumId, status, type, search } = {}) {
+    const scope = this.unitTenantScope(condominiumId, { blockAlias: 'b', unitAlias: 'u' });
     let sql = `
       SELECT a.*, a.entry_time AS entered_at, a.exit_time AS exited_at, u.block, u.number as unit_number
       FROM access_logs a
       LEFT JOIN units u ON a.destination_unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
-      WHERE 1=1
+      WHERE 1=1${scope.sql}
     `;
-    const params = [];
-
-    if (condominiumId) {
-      const cId = parseInt(condominiumId, 10);
-      if (cId === 1) {
-        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
-      } else {
-        sql += ' AND b.condominium_id = ?';
-        params.push(cId);
-      }
-    }
+    const params = [...scope.params];
 
     if (status) {
       sql += ' AND a.status = ?';
@@ -57,6 +48,12 @@ export class AccessDAO {
   }
 
   registerEntry(data) {
+    const rawUnitId = data.destination_unit_id || data.unit_id;
+    const unitId = parseInt(rawUnitId, 10);
+    if (!Number.isInteger(unitId) || unitId <= 0) {
+      throw new Error('Unidade de destino é obrigatória.');
+    }
+
     const stmt = this.db.prepare(`
       INSERT INTO access_logs (
         visitor_name, document, type, destination_unit_id, status,
@@ -69,7 +66,7 @@ export class AccessDAO {
       data.visitor_name,
       data.document,
       data.type || 'Visitante',
-      parseInt(data.destination_unit_id || data.unit_id, 10),
+      unitId,
       data.company || null,
       data.vehicle_plate || null,
       data.authorized_by || null,
@@ -126,21 +123,18 @@ export class AccessDAO {
   }
 }
 
-export class AnnouncementDAO {
+export class AnnouncementDAO extends AbstractTenantDAO {
   constructor() {
-    this.db = DatabaseSingleton.getDb();
-    this.notifier = new AnnouncementNotificationDispatcher();
+    super();
+    this.notifier = NotificationDispatcherFactory.createDispatcher('announcement');
   }
 
-  tenantScope(condominiumId) {
-    const condoId = parseInt(condominiumId, 10);
-    if (!Number.isInteger(condoId) || condoId <= 0) {
+  tenantScope(options) {
+    const condoId = this.resolveCondominiumId(options);
+    if (!condoId) {
       throw new Error('Condomínio inválido para esta operação.');
     }
-    if (condoId === 1) {
-      return { sql: '(condominium_id = 1 OR condominium_id IS NULL)', params: [] };
-    }
-    return { sql: 'condominium_id = ?', params: [condoId] };
+    return this.directTenantScope(condoId, { columnName: 'condominium_id' });
   }
 
   getAnnouncements({ condominiumId, category, priority, search } = {}) {

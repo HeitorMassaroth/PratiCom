@@ -257,15 +257,6 @@ app.patch('/api/deliveries/:id/cancel', checkModuleAvailability('deliveries'), (
   }
 });
 
-app.delete('/api/deliveries/:id', checkModuleAvailability('deliveries'), (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = deliveryDAO.deleteDelivery(id, { condominiumId: req.condominiumId });
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
 
 // ==========================================
 // 3. ENTRADA E SAÍDA DE PESSOAS (PORTARIA)
@@ -282,14 +273,19 @@ app.get('/api/access', checkModuleAvailability('access'), (req, res) => {
 
 app.post('/api/access/entry', checkModuleAvailability('access'), (req, res) => {
   try {
-    const { visitor_name, document } = req.body;
+    const { visitor_name, document, destination_unit_id, unit_id } = req.body;
     if (!visitor_name || !document) {
       return res.status(400).json({ error: 'Nome e documento são obrigatórios.' });
+    }
+    const targetUnit = destination_unit_id || unit_id;
+    if (!targetUnit) {
+      return res.status(400).json({ error: 'Unidade de destino é obrigatória.' });
     }
     const created = accessDAO.registerEntry(req.body);
     res.status(201).json(created);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = /obrigat|inválid|não encontrada/i.test(err.message) ? 400 : 500;
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -409,7 +405,7 @@ app.patch('/api/residents/:id', (req, res) => {
     if (!req.body.name) {
       return res.status(400).json({ error: 'Nome é obrigatório.' });
     }
-    const updated = residentDAO.updateResident(id, req.body);
+    const updated = residentDAO.updateResident(id, req.body, req.condominiumId);
     res.json(updated);
   } catch (err) {
     const status = /não encontrado/i.test(err.message) ? 404 : 400;
@@ -420,7 +416,10 @@ app.patch('/api/residents/:id', (req, res) => {
 app.delete('/api/residents/:id', (req, res) => {
   try {
     const { id } = req.params;
-    residentDAO.deleteResident(id);
+    const deleted = residentDAO.deleteResident(id, req.condominiumId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Morador não encontrado neste condomínio.' });
+    }
     res.json({ message: 'Morador removido com sucesso.' });
   } catch (err) {
     res.status(500).json({ error: err.message });

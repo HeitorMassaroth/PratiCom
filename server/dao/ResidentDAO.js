@@ -1,32 +1,24 @@
-import DatabaseSingleton from '../config/DatabaseSingleton.js';
+import { AbstractTenantDAO } from './AbstractTenantDAO.js';
+import { CreateResidentOperation } from '../services/templates/EntityOperationTemplate.js';
 
 /**
- * Padrão de Projeto: DAO (Data Access Object - 1/3)
+ * Padrão de Projeto: DAO (Data Access Object) com herança de AbstractTenantDAO
  * Isolamento e abstração do acesso aos dados de Unidades, Moradores e Veículos no SQLite.
  */
-export class ResidentDAO {
+export class ResidentDAO extends AbstractTenantDAO {
   constructor() {
-    this.db = DatabaseSingleton.getDb();
+    super();
   }
 
   getUnits({ condominiumId } = {}) {
+    const scope = this.unitTenantScope(condominiumId, { blockAlias: 'b', unitAlias: 'u' });
     let sql = `
       SELECT u.id, u.block_id, COALESCE(b.name, u.block) as block, u.number, u.floor, u.type, b.condominium_id
       FROM units u
       LEFT JOIN blocks b ON u.block_id = b.id
-      WHERE 1=1
+      WHERE 1=1${scope.sql}
     `;
-    const params = [];
-
-    if (condominiumId) {
-      const cId = parseInt(condominiumId, 10);
-      if (cId === 1) {
-        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
-      } else {
-        sql += ' AND b.condominium_id = ?';
-        params.push(cId);
-      }
-    }
+    const params = [...scope.params];
 
     sql += ' ORDER BY COALESCE(b.name, u.block), u.number';
     const units = this.db.prepare(sql).all(params);
@@ -213,29 +205,45 @@ export class ResidentDAO {
   }
 
   createResident(data) {
-    const stmt = this.db.prepare(`
-      INSERT INTO residents (unit_id, name, email, phone, cpf, role, emergency_contact)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    const info = stmt.run(
-      parseInt(data.unit_id, 10),
-      data.name,
-      data.email || null,
-      data.phone || null,
-      data.cpf || null,
-      data.role || 'Proprietário',
-      data.emergency_contact || null
-    );
-
-    const resident = this.db.prepare('SELECT * FROM residents WHERE id = ?').get(info.lastInsertRowid);
-    const unit = this.db.prepare('SELECT block, number FROM units WHERE id = ?').get(resident.unit_id) || {};
-    return { ...resident, block: unit.block || '', unit_number: unit.number || '' };
+    return new CreateResidentOperation().execute(data);
   }
 
-  updateResident(id, data) {
+  getResident(id, condominiumId) {
     const rId = parseInt(id, 10);
-    const existing = this.db.prepare('SELECT * FROM residents WHERE id = ?').get(rId);
+    if (!Number.isInteger(rId)) return null;
+
+    let sql = `
+      SELECT r.*, u.block, u.number as unit_number, b.condominium_id as block_condominium_id
+      FROM residents r
+      LEFT JOIN units u ON r.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
+      WHERE r.id = ?
+    `;
+    const params = [rId];
+
+    if (condominiumId) {
+      const cId = parseInt(condominiumId, 10);
+      if (cId === 1) {
+        sql += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
+      } else {
+        sql += ' AND b.condominium_id = ?';
+        params.push(cId);
+      }
+    }
+
+    return this.db.prepare(sql).get(...params) || null;
+  }
+
+  updateResident(id, data, condominiumId) {
+    const rId = parseInt(id, 10);
+    const existing = this.getResident(rId, condominiumId);
     if (!existing) throw new Error('Morador não encontrado.');
+
+    if (data.unit_id) {
+      const uId = parseInt(data.unit_id, 10);
+      const unit = this.getUnit(uId);
+      if (!unit) throw new Error('Unidade não encontrada.');
+    }
 
     this.db.prepare(`
       UPDATE residents
@@ -257,9 +265,17 @@ export class ResidentDAO {
     return { ...updated, block: unit.block || '', unit_number: unit.number || '' };
   }
 
-  deleteResident(id) {
+  deleteResident(id, condominiumId) {
+    const rId = parseInt(id, 10);
+    if (!Number.isInteger(rId)) return false;
+
+    if (condominiumId) {
+      const existing = this.getResident(rId, condominiumId);
+      if (!existing) return false;
+    }
+
     const stmt = this.db.prepare('DELETE FROM residents WHERE id = ?');
-    const info = stmt.run(parseInt(id, 10));
+    const info = stmt.run(rId);
     return info.changes > 0;
   }
 

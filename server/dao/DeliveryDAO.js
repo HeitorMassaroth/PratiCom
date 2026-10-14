@@ -1,24 +1,20 @@
-import DatabaseSingleton from '../config/DatabaseSingleton.js';
-import { DeliveryNotificationDispatcher } from '../services/templates/NotificationTemplate.js';
+import { AbstractTenantDAO } from './AbstractTenantDAO.js';
+import { CreateDeliveryOperation } from '../services/templates/EntityOperationTemplate.js';
+import { NotificationDispatcherFactory } from '../services/factories/NotificationDispatcherFactory.js';
 
 /**
- * Padrão de Projeto: DAO (Data Access Object - 2/3)
+ * Padrão de Projeto: DAO (Data Access Object) com herança de AbstractTenantDAO
  * Abstração e persistência relacional de encomendas recebidas na portaria.
  */
-export class DeliveryDAO {
+export class DeliveryDAO extends AbstractTenantDAO {
   constructor() {
-    this.db = DatabaseSingleton.getDb();
-    this.notifier = new DeliveryNotificationDispatcher();
+    super();
+    this.notifier = NotificationDispatcherFactory.createDispatcher('delivery');
   }
 
-  // Restringe a consulta às unidades do condomínio ativo (aliases u = units, b = blocks).
-  tenantScope(condominiumId) {
-    if (!condominiumId) return { sql: '', params: [] };
-    const cId = parseInt(condominiumId, 10);
-    if (cId === 1) {
-      return { sql: ' AND (b.condominium_id = 1 OR u.block_id IS NULL)', params: [] };
-    }
-    return { sql: ' AND b.condominium_id = ?', params: [cId] };
+  // Utiliza o Template Method unitTenantScope da classe base
+  tenantScope(options) {
+    return this.unitTenantScope(options, { blockAlias: 'b', unitAlias: 'u' });
   }
 
   getDeliveries({ condominiumId, status, unit_id } = {}) {
@@ -80,40 +76,7 @@ export class DeliveryDAO {
   }
 
   createDelivery(data, condominiumId) {
-    const unitId = parseInt(data.unit_id, 10);
-    const residentId = data.resident_id ? parseInt(data.resident_id, 10) : null;
-    this.validateRecipient(unitId, residentId, condominiumId);
-
-    const pickupCode = String(Math.floor(1000 + Math.random() * 9000));
-    const stmt = this.db.prepare(`
-      INSERT INTO deliveries (unit_id, resident_id, courier, tracking_code, description, status, pickup_code, notes, received_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, CURRENT_TIMESTAMP)
-    `);
-
-    const info = stmt.run(
-      unitId,
-      residentId,
-      data.courier,
-      data.tracking_code || null,
-      data.description || '',
-      pickupCode,
-      data.notes || ''
-    );
-
-    const delivery = this.getDelivery(info.lastInsertRowid);
-    const resident = delivery.resident_id ? this.db.prepare('SELECT name, phone, email FROM residents WHERE id = ?').get(delivery.resident_id) : null;
-
-    // Dispara notificação via Template Method
-    if (resident) {
-      this.notifier.sendNotification(resident, delivery);
-    }
-
-    return {
-      ...delivery,
-      block: delivery.block || '',
-      unit_number: delivery.unit_number || '',
-      resident_name: resident ? resident.name : 'Morador'
-    };
+    return new CreateDeliveryOperation().execute(data, { condominiumId });
   }
 
   updateDelivery(id, data, condominiumId) {

@@ -1,5 +1,5 @@
-import DatabaseSingleton from '../config/DatabaseSingleton.js';
-import { PixPaymentProcessor, CondoFeePaymentProcessor, CardPaymentProcessor } from '../services/templates/PaymentTemplate.js';
+import { AbstractTenantDAO } from './AbstractTenantDAO.js';
+import { PaymentProcessorFactory } from '../services/factories/PaymentProcessorFactory.js';
 
 // Ícone exibido quando o produto não tem um próprio cadastrado.
 const CATEGORY_ICONS = {
@@ -11,14 +11,14 @@ const CATEGORY_ICONS = {
   'Mercearia': '🛒'
 };
 
-export class MarketDAO {
+export class MarketDAO extends AbstractTenantDAO {
   constructor() {
-    this.db = DatabaseSingleton.getDb();
-    // Forma de pagamento recebida da tela → código gravado na venda e processador (Template Method)
+    super();
+    // Instancia estratégias via Factory Method
     this.paymentMethods = {
-      pix: { code: 'PIX', processor: new PixPaymentProcessor() },
-      credit_card: { code: 'CARD', processor: new CardPaymentProcessor() },
-      condo_bill: { code: 'CONDO_FEE', processor: new CondoFeePaymentProcessor() }
+      pix: PaymentProcessorFactory.createProcessor('pix'),
+      credit_card: PaymentProcessorFactory.createProcessor('credit_card'),
+      condo_bill: PaymentProcessorFactory.createProcessor('condo_bill')
     };
   }
 
@@ -189,8 +189,10 @@ export class MarketDAO {
       throw new Error('Carrinho de compras vazio.');
     }
 
-    const method = this.paymentMethods[payment_method];
-    if (!method) {
+    let method;
+    try {
+      method = PaymentProcessorFactory.createProcessor(payment_method);
+    } catch {
       throw new Error('Forma de pagamento inválida.');
     }
 

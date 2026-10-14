@@ -1,0 +1,666 @@
+================================================================================
+          DOSSIÊ TÉCNICO E GUIA COMPLETO PARA DEFESA DE AUTORIA DE SOFTWARE
+                     SISTEMA: PRATICOM CONDOMINIAL ERP
+================================================================================
+
+Este documento é a referência técnica definitiva e detalhada para a prova de
+autoria de código. Ele disseca o sistema ARQUIVO POR ARQUIVO, documentando as
+funções críticas, assinaturas, fluxos, trechos de código e a justificativa
+arquitetural de cada decisão.
+
+================================================================================
+SUMÁRIO GERAL
+================================================================================
+1. VISÃO GERAL E DEFESA EM 30 SEGUNDOS
+2. ARQUIVOS DE CONFIGURAÇÃO & SINGLETONS (GoF)
+   - server/config/DatabaseSingleton.js
+   - server/config/AppConfigSingleton.js
+3. ARQUIVOS DE TEMPLATE METHOD (GoF & REUSO DE SOFTWARE)
+   - server/dao/AbstractTenantDAO.js
+   - server/services/templates/BusinessValidatorTemplate.js
+   - server/services/templates/EntityOperationTemplate.js
+   - server/services/templates/PaymentTemplate.js
+   - server/services/templates/NotificationTemplate.js
+   - server/services/templates/ReportTemplate.js
+4. ARQUIVOS DE FACTORY METHOD (GoF & DESACOPLAMENTO)
+   - server/dao/DAOFactory.js
+   - server/services/factories/PaymentProcessorFactory.js
+   - server/services/factories/NotificationDispatcherFactory.js
+5. ARQUIVOS DE PERSISTÊNCIA E CRUDS (DAOS)
+   - server/dao/CondominiumDAO.js (Condomínios, Blocos, Unidades, Módulos)
+   - server/dao/ResidentDAO.js (Moradores, Veículos)
+   - server/dao/DeliveryDAO.js (Encomendas, Geração de PIN, Baixa Segura)
+   - server/dao/AccessDAO.js (Portaria, Visitantes, Registro de Entrada/Saída)
+   - server/dao/ReservationDAO.js (Espaços Comuns, Reservas e Conflitos)
+   - server/dao/FinancialDAO.js (Transações, Contabilidade, Balancete)
+   - server/dao/AnnouncementDAO.js (Mural de Avisos, Destaque Fixado no Topo)
+   - server/dao/MarketDAO.js (Mercadinho, Estoque, Checkout ACID Transacional)
+   - server/dao/OperationsDAO.js (Linha de Produtos de Software - LPS, Dashboard)
+6. ARQUIVOS DE MIDDLEWARE E CONTROLE
+   - server/middleware/moduleGuard.js (Guarda de Módulos 403 Forbidden)
+   - server/server.js (Servidor RESTful, Roteamento e Injeção de Dependências)
+7. ESQUEMA RELACIONAL (server/schema.sql)
+8. ROTEIRO DE PERGUNTAS E RESPOSTAS TÉCNICAS DE CÓDIGO (Q&A)
+
+================================================================================
+1. VISÃO GERAL E DEFESA EM 30 SEGUNDOS
+================================================================================
+Se a banca pedir um resumo direto:
+"O PratiCom é um ERP Condominial Multi-Tenant autônomo, construído em Node.js e
+SQLite relacional puro, sem dependência de arquivos JSON para dados e totalmente
+desacoplado do frontend (Headless REST API). A arquitetura é fundamentada em
+engenharia de Reuso de Software através dos padrões GoF: 2 Singletons diretos
+(conexão SQLite e configurações globais), 6 Template Methods cobrindo isolamento
+multi-tenant, validação de regras de negócio, ciclo de vida de operações,
+pagamentos, mensageria e relatórios, e 3 Factory Methods para desacoplamento de
+DAOs, gateways de pagamento e despachantes de notificação. Possui 12 CRUDs
+canônicos completos e suporte a Linha de Produtos de Software (LPS)."
+
+================================================================================
+2. ARQUIVOS DE CONFIGURAÇÃO & SINGLETONS (GoF)
+================================================================================
+
+--------------------------------------------------------------------------------
+ARQUIVO 1: server/config/DatabaseSingleton.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF SINGLETON (Instância única de banco de dados).
+- Por que foi usado: Evitar travamentos de concorrência de escrita no SQLite
+  (SQLITE_BUSY / file locking), garantir o reuso de conexão aberta ('better-sqlite3')
+  e forçar a execução imediata de 'PRAGMA foreign_keys = ON'.
+- Código Crítico:
+  ```javascript
+  class DatabaseSingleton {
+    constructor() {
+      if (DatabaseSingleton.instance) {
+        return DatabaseSingleton.instance;
+      }
+      this.db = new Database(dbPath);
+      this.db.pragma('foreign_keys = ON'); // Ativa integridade referencial
+      this.applyCompatibilityMigrations();
+      this.seedCondominiumModules();
+      DatabaseSingleton.instance = this;
+    }
+    getDb() { return this.db; }
+  }
+  const instance = new DatabaseSingleton();
+  Object.freeze(instance); // Impede qualquer alteração em tempo de execução
+  export const db = instance.getDb(); // Export direto da conexão
+  ```
+- Funções Detalhadas:
+  * `constructor()`: Verifica se `DatabaseSingleton.instance` existe. Se não existir,
+    instancia o `better-sqlite3`, ativa chaves estrangeiras, executa migrações de
+    compatibilidade e semeia módulos dinâmicos.
+  * `getDb()`: Retorna o objeto de conexão do banco de dados.
+  * `applyCompatibilityMigrations()`: Garante retrocompatibilidade com esquemas antigos
+    adicionando colunas ausentes sem destruir dados legados.
+  * `ensureUnitUniquenessConstraint()`: Saneia duplicidades históricas e aplica a
+    restrição UNIQUE(block_id, number) no SQLite.
+  * `seedCondominiumModules()`: Garante que todo condomínio cadastrado tenha os 6
+    módulos opcionais registrados na tabela 'condominium_modules'.
+
+--------------------------------------------------------------------------------
+ARQUIVO 2: server/config/AppConfigSingleton.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF SINGLETON (Instância única de configurações).
+- Por que foi usado: Isolar as variáveis de ambiente e configurações da Linha de
+  Produtos de Software (LPS) em um ponto central imutável, impedindo alterações
+  indevidas durante o ciclo de vida do servidor.
+- Código Crítico:
+  ```javascript
+  class AppConfigSingleton {
+    constructor() {
+      if (AppConfigSingleton.instance) {
+        return AppConfigSingleton.instance;
+      }
+      this.config = {
+        port: process.env.PORT || 5000,
+        env: process.env.NODE_ENV || 'development',
+        dbPath: path.resolve(__dirname, '..', 'condo_database.sqlite'),
+        lps: {
+          enableMarketplace: process.env.ENABLE_MARKETPLACE !== 'false',
+          multiTenantStrict: true
+        }
+      };
+      AppConfigSingleton.instance = this;
+    }
+    get(key) { return this.config[key]; }
+    getAll() { return { ...this.config }; }
+  }
+  const instance = new AppConfigSingleton();
+  Object.freeze(instance);
+  export const appConfig = instance;
+  ```
+- Funções Detalhadas:
+  * `get(key)`: Retorna uma propriedade de configuração específica.
+  * `getAll()`: Retorna uma cópia defensiva de todo o mapa de configurações.
+
+================================================================================
+3. ARQUIVOS DE TEMPLATE METHOD (GoF & REUSO DE SOFTWARE)
+================================================================================
+
+--------------------------------------------------------------------------------
+ARQUIVO 3: server/dao/AbstractTenantDAO.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF TEMPLATE METHOD (Gabarito de Persistência Multi-Tenant).
+- Por que foi usado: Centralizar e padronizar o isolamento multi-tenant de todas
+  as consultas SQL do sistema. Todos os 8 DAOs herdam desta classe base.
+- Código Crítico:
+  ```javascript
+  export class AbstractTenantDAO {
+    constructor() {
+      this.db = DatabaseSingleton.getDb();
+    }
+    getDb() { return this.db; }
+
+    resolveCondominiumId(options) {
+      if (options === undefined || options === null) return null;
+      const raw = typeof options === 'object' ? options.condominiumId : options;
+      const parsed = parseInt(raw, 10);
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    }
+
+    unitTenantScope(options, { blockAlias = 'b', unitAlias = 'u' } = {}) {
+      const condoId = this.resolveCondominiumId(options);
+      if (!condoId) return { sql: '', params: [] };
+      if (condoId === 1) {
+        return {
+          sql: ` AND (${blockAlias}.condominium_id = 1 OR ${unitAlias}.block_id IS NULL)`,
+          params: []
+        };
+      }
+      return {
+        sql: ` AND ${blockAlias}.condominium_id = ?`,
+        params: [condoId]
+      };
+    }
+
+    directTenantScope(options, { tableAlias = '', columnName = 'condominium_id' } = {}) {
+      const condoId = this.resolveCondominiumId(options);
+      if (!condoId) return { sql: '1=1', params: [] };
+      const prefix = tableAlias ? `${tableAlias}.` : '';
+      if (condoId === 1) {
+        return {
+          sql: `(${prefix}${columnName} = 1 OR ${prefix}${columnName} IS NULL)`,
+          params: []
+        };
+      }
+      return {
+        sql: `${prefix}${columnName} = ?`,
+        params: [condoId]
+      };
+    }
+  }
+  ```
+- Funções Detalhadas:
+  * `resolveCondominiumId(options)`: Normaliza o ID do condomínio, tratando tanto
+    números puros (`1`) quanto objetos de contexto (`{ condominiumId: 1 }`).
+  * `unitTenantScope(...)`: Gera dinamicamente cláusulas SQL com JOINs entre unidades
+    e blocos, garantindo isolamento relacional mesmo em dados legados (ID 1).
+  * `directTenantScope(...)`: Gera dinamicamente filtros diretos `WHERE condominium_id = ?`
+    para tabelas que possuem a coluna de tenant explícita.
+
+--------------------------------------------------------------------------------
+ARQUIVO 4: server/services/templates/BusinessValidatorTemplate.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF TEMPLATE METHOD (Validação de Regras de Negócio).
+- Por que foi usado: Impede que regras essenciais sejam puladas. Define a ordem
+  rígida em que toda validação deve ocorrer no sistema.
+- Código Crítico:
+  ```javascript
+  export class AbstractBusinessValidator {
+    validate(data, context = {}) {
+      this.checkRequiredFields(data);
+      this.checkTemporalConstraints(data);
+      this.checkUniquenessAndConflicts(data, context);
+      this.checkRelationalIntegrity(data, context);
+      return true;
+    }
+    checkRequiredFields(data) { ... }
+    checkTemporalConstraints(data) { /* Hook */ }
+    checkUniquenessAndConflicts(data, context) { /* Hook */ }
+    checkRelationalIntegrity(data, context) { /* Hook */ }
+  }
+
+  export class ReservationConflictValidator extends AbstractBusinessValidator {
+    constructor(db) { super(); this.db = db; }
+
+    checkTemporalConstraints(data) {
+      // Bloqueia reservas em datas passadas e força duração exata de 1 hora
+      ...
+    }
+
+    checkUniquenessAndConflicts(data, context) {
+      let sql = `
+        SELECT COUNT(*) as count FROM reservations
+        WHERE space_id = ? AND reservation_date = ? 
+        AND UPPER(status) IN ('CONFIRMED', 'CONFIRMADA')
+        AND start_time < ? AND end_time > ?
+      `;
+      // Se count > 0, lança Error: Já existe reserva confirmada no horário
+    }
+  }
+  ```
+- Funções Detalhadas:
+  * `validate(data, context)`: O método esqueleto (Template Method) que invoca
+    sequencialmente os 4 passos de validação.
+  * `ReservationConflictValidator`: Subclasse concreta que sobrescreve
+    `checkTemporalConstraints` e `checkUniquenessAndConflicts`, aplicando a
+    fórmula matemática de colisão de intervalos temporais:
+    `start_time < novo_fim AND end_time > novo_inicio`.
+
+--------------------------------------------------------------------------------
+ARQUIVO 5: server/services/templates/EntityOperationTemplate.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF TEMPLATE METHOD (Ciclo de Vida de Operações de Domínio).
+- Por que foi usado: Padronizar toda mutação de dados em 4 etapas invariantes:
+  validação -> escopo de condomínio -> gravação no banco -> efeitos colaterais.
+- Código Crítico:
+  ```javascript
+  export class AbstractEntityOperation {
+    constructor() { this.db = DatabaseSingleton.getDb(); }
+
+    execute(input, context = {}) {
+      this.validate(input, context);
+      this.assertTenantScope(input, context);
+      const result = this.executePersist(input, context);
+      this.triggerSideEffects(result, input, context);
+      return result;
+    }
+    // Hooks abstratos
+  }
+
+  // 1. Criação de Morador
+  export class CreateResidentOperation extends AbstractEntityOperation {
+    validate(input) { ... }
+    executePersist(input) {
+      const stmt = this.db.prepare('INSERT INTO residents ...');
+      ...
+    }
+  }
+
+  // 2. Criação de Reserva
+  export class CreateReservationOperation extends AbstractEntityOperation {
+    constructor() {
+      super();
+      this.validator = new ReservationConflictValidator(this.db);
+    }
+    validate(input, context) {
+      super.validate(input, context);
+      this.validator.validate(input, context); // Reuso do validador Template
+    }
+    executePersist(input) { ... }
+  }
+
+  // 3. Criação de Encomenda
+  export class CreateDeliveryOperation extends AbstractEntityOperation {
+    executePersist(input) {
+      const pickupCode = input.pickup_code || String(Math.floor(1000 + Math.random() * 9000));
+      // Insere encomenda com status 'pending' e código PIN de 4 dígitos
+    }
+    triggerSideEffects(delivery) {
+      // Dispara notificação automática ao morador via NotificationDispatcher
+    }
+  }
+  ```
+
+--------------------------------------------------------------------------------
+ARQUIVO 6: server/services/templates/PaymentTemplate.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF TEMPLATE METHOD (Processamento Financeiro).
+- Por que foi usado: Garantir que qualquer meio de pagamento (Pix, Cartão, Boleto)
+  execute a mesma sequência de segurança antes de confirmar a transação.
+- Código Crítico:
+  ```javascript
+  export class AbstractPaymentProcessor {
+    processPayment(paymentDetails) {
+      this.validateAmount(paymentDetails.amount);
+      this.assertAccountStatus(paymentDetails);
+      const transactionId = this.processTransfer(paymentDetails);
+      const receipt = this.generateReceipt(paymentDetails, transactionId);
+      return { success: true, transactionId, receipt };
+    }
+  }
+  ```
+- Subclasses:
+  * `PixPaymentProcessor`: Valida valor positivo, gera payload e QR Code Pix.
+  * `CondoFeePaymentProcessor`: Valida vinculação da unidade e lança débito na cota condominial.
+  * `CardPaymentProcessor`: Simula autorização de adquirente de cartão de crédito.
+
+--------------------------------------------------------------------------------
+ARQUIVO 7: server/services/templates/NotificationTemplate.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF TEMPLATE METHOD (Mensageria e Notificações).
+- Por que foi usado: Desacoplar os alertas de portaria e comunicados da forma
+  física de despacho (Console, SMS, Push, E-mail).
+- Código Crítico:
+  ```javascript
+  export class AbstractNotificationDispatcher {
+    sendNotification(recipient, payload) {
+      const header = this.formatHeader(payload);
+      const body = this.formatBody(payload);
+      const audience = this.resolveAudience(recipient);
+      return this.dispatch(audience, `${header}\n${body}`);
+    }
+  }
+  ```
+- Subclasses:
+  * `DeliveryNotificationDispatcher`: Notifica morador sobre chegada de encomenda com PIN.
+  * `AnnouncementNotificationDispatcher`: Notifica moradores sobre novos avisos no mural.
+
+--------------------------------------------------------------------------------
+ARQUIVO 8: server/services/templates/ReportTemplate.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF TEMPLATE METHOD (Consolidação de Relatórios).
+- Por que foi usado: Padronizar o pipeline de geração de relatórios contábeis:
+  `fetchRawData` -> `aggregateMetrics` -> `formatOutput`.
+- Subclasse Concreta:
+  * `FinancialBalanceReport`: Agrega entradas (INCOME), saídas (EXPENSE) e calcula
+    o saldo líquido total do condomínio.
+
+================================================================================
+4. ARQUIVOS DE FACTORY METHOD (GoF & DESACOPLAMENTO)
+================================================================================
+
+--------------------------------------------------------------------------------
+ARQUIVO 9: server/dao/DAOFactory.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF FACTORY METHOD (Fábrica Central de DAOs).
+- Por que foi usado: Eliminar o acoplamento entre os arquivos de rotas do Express
+  e as classes concretas de banco de dados.
+- Código Crítico:
+  ```javascript
+  export class DAOFactory {
+    static getDAO(type) {
+      switch (type.toLowerCase()) {
+        case 'resident':
+        case 'unit': return new ResidentDAO();
+        case 'delivery': return new DeliveryDAO();
+        case 'financial': return new FinancialDAO();
+        case 'access': return new AccessDAO();
+        case 'reservation': return new ReservationDAO();
+        case 'market': return new MarketDAO();
+        case 'announcement': return new AnnouncementDAO();
+        case 'condominium':
+        case 'block': return new CondominiumDAO();
+        default: throw new Error(`Tipo de DAO desconhecido: ${type}`);
+      }
+    }
+  }
+  ```
+
+--------------------------------------------------------------------------------
+ARQUIVO 10: server/services/factories/PaymentProcessorFactory.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF FACTORY METHOD (Fábrica de Processadores de Pagamento).
+- Por que foi usado: Permitir que o checkout do Mercadinho aceite novos métodos de
+  pagamento (Pix, Cartão, Boleto) sem alterar uma única linha do código de checkout.
+- Código Crítico:
+  ```javascript
+  export class PaymentProcessorFactory {
+    static createProcessor(paymentMethod) {
+      const normalized = String(paymentMethod || '').toLowerCase();
+      switch (normalized) {
+        case 'pix': return { code: 'PIX', processor: new PixPaymentProcessor() };
+        case 'credit_card':
+        case 'card': return { code: 'CARD', processor: new CardPaymentProcessor() };
+        case 'condo_bill':
+        case 'condo_fee': return { code: 'CONDO_FEE', processor: new CondoFeePaymentProcessor() };
+        default: throw new Error(`Forma de pagamento não suportada: ${paymentMethod}`);
+      }
+    }
+  }
+  ```
+
+--------------------------------------------------------------------------------
+ARQUIVO 11: server/services/factories/NotificationDispatcherFactory.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Padrão GoF FACTORY METHOD (Fábrica de Despachantes de Notificação).
+- Por que foi usado: Permitir que DAOs disparem eventos de mensageria sem conhecer
+  as classes concretas de entrega de mensagens.
+- Código Crítico:
+  ```javascript
+  export class NotificationDispatcherFactory {
+    static createDispatcher(eventType) {
+      const normalized = String(eventType || '').toLowerCase();
+      switch (normalized) {
+        case 'delivery':
+        case 'encomenda': return new DeliveryNotificationDispatcher();
+        case 'announcement':
+        case 'comunicado':
+        case 'aviso': return new AnnouncementNotificationDispatcher();
+        default: throw new Error(`Tipo de notificador não suportado: ${eventType}`);
+      }
+    }
+  }
+  ```
+
+================================================================================
+5. ARQUIVOS DE PERSISTÊNCIA E CRUDS (DAOS)
+================================================================================
+
+--------------------------------------------------------------------------------
+ARQUIVO 12: server/dao/CondominiumDAO.js
+--------------------------------------------------------------------------------
+- CRUDs que implementa:
+  1. CRUD de Condomínios (tabela 'condominiums')
+  2. CRUD de Blocos (tabela 'blocks')
+  3. CRUD de Unidades (tabela 'units')
+  4. Fluxo de Módulos Dinâmicos (tabela 'condominium_modules')
+- Métodos Importantes:
+  * `getCondominiums()`: Lista todos os condomínios com total de blocos e unidades.
+  * `createCondominium(data)`: Cadastra novo condomínio e ativa módulos padrão.
+  * `getBlocks(condominiumId)`: Lista blocos vinculados ao condomínio.
+  * `createBlock(data)`: Insere bloco com validação case-insensitive de nome duplicado.
+  * `getModules(condominiumId)`: Retorna os 6 módulos opcionais e status (enabled 0/1).
+  * `updateModules(condominiumId, modulesMap)`: Atualiza em lote a ativação dos módulos.
+  * `isModuleEnabled(condominiumId, moduleKey)`: Verificação booleana rápida usada pelo middleware de segurança.
+
+--------------------------------------------------------------------------------
+ARQUIVO 13: server/dao/ResidentDAO.js
+--------------------------------------------------------------------------------
+- CRUDs que implementa:
+  1. CRUD de Moradores (tabela 'residents')
+  2. CRUD de Veículos (tabela 'vehicles')
+- Métodos Importantes:
+  * `createResident(data)`: Delega a criação para `new CreateResidentOperation().execute(data)`.
+  * `getResidents({ condominiumId, unit_id, search })`: Busca moradores aplicando filtros
+    multi-tenant e busca textual por nome/CPF/e-mail.
+  * `deleteResident(id, condominiumId)`: Remove morador respeitando isolamento cross-tenant.
+  * `createVehicle(data, condominiumId)`: Valida se a unidade pertence ao condomínio,
+    normaliza a placa para UPPERCASE e persiste o veículo.
+  * `updateVehicle(id, data, condominiumId)`: Permite alterar cor, placa, modelo e vaga
+    com proteção contra invasão de tenant.
+
+--------------------------------------------------------------------------------
+ARQUIVO 14: server/dao/DeliveryDAO.js
+--------------------------------------------------------------------------------
+- CRUD que implementa:
+  1. CRUD de Encomendas (tabela 'deliveries')
+- Métodos Importantes:
+  * `createDelivery(data, context)`: Delega para `new CreateDeliveryOperation().execute(data, context)`.
+    Gera automaticamente o código PIN de 4 dígitos.
+  * `deliverPackage(id, pickupCode, pickedUpBy)`: Realiza a baixa segura da encomenda.
+    Compara o PIN informado com o banco de dados; se coincidir, atualiza status para 'delivered'.
+  * `cancelDelivery(id, reason, cancelledBy)`: Cancela a encomenda exigindo motivo
+    justificado, gravando data, hora e responsável pelo cancelamento.
+  * `deleteDelivery(id, condominiumId)`: Exclusão com proteção 404 e isolamento cross-tenant.
+
+--------------------------------------------------------------------------------
+ARQUIVO 15: server/dao/AccessDAO.js (em server/dao/OperationsDAO.js)
+--------------------------------------------------------------------------------
+- CRUD que implementa:
+  1. CRUD de Controle de Acesso / Portaria (tabela 'access_logs')
+- Métodos Importantes:
+  * `registerEntry(data, condominiumId)`: Registra entrada de visitante/prestador,
+    marcando status 'IN_PROPERTY' e registrando timestamp e unidade de destino.
+  * `registerExit(id, condominiumId)`: Atualiza status para 'EXITED' e preenche 'exit_time'.
+  * `getLogs({ condominiumId, status, search })`: Filtra acessos por período, status ou placa.
+
+--------------------------------------------------------------------------------
+ARQUIVO 16: server/dao/ReservationDAO.js
+--------------------------------------------------------------------------------
+- CRUDs que implementa:
+  1. CRUD de Espaços Comuns (tabela 'spaces')
+  2. CRUD de Reservas (tabela 'reservations')
+- Métodos Importantes:
+  * `createReservation(data, context)`: Delega para `new CreateReservationOperation().execute(data, context)`.
+    Executa o `ReservationConflictValidator` (Template Method) impedindo reservas passadas
+    e colisões de horário no mesmo espaço comum.
+  * `cancelReservation(id, reason, condominiumId)`: Atualiza o status para 'CANCELLED'.
+  * `getSpaces({ condominiumId })`: Lista áreas reserváveis vinculadas ao condomínio.
+
+--------------------------------------------------------------------------------
+ARQUIVO 17: server/dao/FinancialDAO.js
+--------------------------------------------------------------------------------
+- CRUD que implementa:
+  1. CRUD de Lançamentos Financeiros (tabela 'financial_transactions')
+- Métodos Importantes:
+  * `createTransaction(data, condominiumId)`: Lança receita (INCOME) ou despesa (EXPENSE).
+  * `getSummary(condominiumId)`: Calcula soma de receitas, soma de despesas e o
+    saldo líquido consolidado (`total_balance = total_income - total_expenses`).
+    Trata tanto parâmetro numérico quanto objeto `{ condominiumId: 1 }`.
+  * `getTransactions({ condominiumId, type, category, status })`: Histórico contábil filtrado.
+
+--------------------------------------------------------------------------------
+ARQUIVO 18: server/dao/AnnouncementDAO.js (em server/dao/OperationsDAO.js)
+--------------------------------------------------------------------------------
+- CRUD que implementa:
+  1. CRUD do Mural de Avisos (tabela 'announcements')
+- Métodos Importantes:
+  * `createAnnouncement(data, condominiumId)`: Publica aviso geral ou urgente.
+    Dispara notificação via `NotificationDispatcherFactory`.
+  * `getAnnouncements(condominiumId)`: Consulta ordenada onde comunicados com prioridade
+    'URGENT' e 'pinned = 1' aparecem no topo de todas as listagens.
+
+--------------------------------------------------------------------------------
+ARQUIVO 19: server/dao/MarketDAO.js
+--------------------------------------------------------------------------------
+- CRUDs e Fluxos que implementa:
+  1. CRUD de Produtos do Mercadinho (tabela 'market_products')
+  2. Fluxo de Vendas do PDV com Transação ACID (tabelas 'market_sales', 'market_sale_items')
+- Métodos Importantes:
+  * `updateStock(id, { delta, quantity, action })`: Atualização atômica de saldo de estoque.
+  * `checkout(orderData, condominiumId)`: O coração do Mercadinho Autônomo.
+    Executa uma transação ACID completa através do SQLite:
+    ```javascript
+    const transaction = this.db.transaction(() => {
+      // 1. Checa disponibilidade de estoque e baixa unidades de cada produto
+      // 2. Calcula total oficial consultando preços direto do banco
+      // 3. Processa pagamento via PaymentProcessorFactory (Template Method)
+      // 4. Grava cabeçalho em market_sales
+      // 5. Grava itens em market_sale_items com preço congelado no ato da venda
+      // 6. Se a forma for 'CONDO_FEE', insere lançamento a receber no FinancialDAO
+      return saleRecord;
+    });
+    return transaction(); // Se qualquer etapa falhar, o SQLite faz ROLLBACK total
+    ```
+
+--------------------------------------------------------------------------------
+ARQUIVO 20: server/dao/OperationsDAO.js
+--------------------------------------------------------------------------------
+- CRUDs e Fluxos que implementa:
+  1. Fluxo de Feature Flags da LPS (tabela 'app_features')
+  2. Resumo de Métricas do Dashboard Consolidado
+- Métodos Importantes:
+  * `getFeatures()` / `updateFeature(key, enabled)`: Gestão de chaves da Linha de Produtos de Software.
+  * `getDashboardSummary(condominiumId)`: Consolida contadores de entregas pendentes,
+    acessos ativos, saldo financeiro e ocupação de espaços em um único payload JSON.
+    Se um módulo estiver desativado no condomínio, retorna `null` para a métrica sem quebrar a rota.
+
+================================================================================
+6. ARQUIVOS DE MIDDLEWARE E CONTROLE
+================================================================================
+
+--------------------------------------------------------------------------------
+ARQUIVO 21: server/middleware/moduleGuard.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Interceptador de Segurança de Módulos (Guard / Policy).
+- Como funciona:
+  ```javascript
+  export const checkModuleAvailability = (moduleKey) => (req, res, next) => {
+    const condominiumId = req.condominiumId;
+    const condoDAO = DAOFactory.getDAO('condominium');
+    if (!condoDAO.isModuleEnabled(condominiumId, moduleKey)) {
+      return res.status(403).json({
+        error: `Acesso negado: o módulo '${moduleKey}' está desativado para este condomínio.`,
+        module: moduleKey,
+        disabled: true
+      });
+    }
+    next();
+  };
+  ```
+- Onde é aplicado: Protege as rotas `/api/deliveries`, `/api/access`, `/api/financial`,
+  `/api/market`, `/api/reservations` e `/api/dashboard`.
+
+--------------------------------------------------------------------------------
+ARQUIVO 22: server/server.js
+--------------------------------------------------------------------------------
+- Papel Arquitetural: Ponto de Entrada da Aplicação e Servidor RESTful Express.
+- Destaques Técnicos:
+  * Extração do Tenant: Intercepta o header `x-condominium-id` ou query param
+    `condominium_id` e injeta `req.condominiumId` em todas as requisições.
+  * Injeção de DAOs: Obtém os DAOs via `DAOFactory.getDAO(...)`.
+  * Middlewares Globais: CORS, JSON parser, guarda de módulos dinâmicos e
+    tratamento centralizado de erros (HTTP 400 para regras de negócio, 404 para
+    itens não encontrados, 409 para conflitos de unicidade/agenda e 500 para falhas).
+
+================================================================================
+7. ESQUEMA RELACIONAL (server/schema.sql)
+================================================================================
+Tabelas criadas e mantidas com integridade referencial:
+- `condominiums` (id, name, address, cnpj, contact_phone, created_at)
+- `blocks` (id, condominium_id [FK], name, description, status)
+- `units` (id, block_id [FK], block, number, floor, type, UNIQUE(block_id, number))
+- `residents` (id, unit_id [FK], name, email, phone, cpf, role, emergency_contact)
+- `vehicles` (id, unit_id [FK], resident_id [FK], plate, model, color, type, parking_spot)
+- `deliveries` (id, unit_id [FK], resident_id [FK], courier, tracking_code, description, status, pickup_code, notes)
+- `access_logs` (id, condominium_id [FK], visitor_name, visitor_document, destination_unit_id [FK], type, vehicle_plate, company, authorized_by, entry_time, exit_time, status)
+- `spaces` (id, condominium_id [FK], name, description, capacity, price_per_hour, rules)
+- `reservations` (id, space_id [FK], unit_id [FK], resident_id [FK], reservation_date, start_time, end_time, guests_count, notes, total_price, status)
+- `financial_transactions` (id, condominium_id [FK], unit_id [FK], description, amount, type, category, status, due_date, payment_date)
+- `announcements` (id, condominium_id [FK], block_id [FK], title, message, priority, pinned, author, expires_at)
+- `market_products` (id, condominium_id [FK], name, category, price, cost_price, stock_quantity, min_stock, barcode, image_url)
+- `market_sales` (id, unit_id [FK], resident_id [FK], total_amount, payment_method, created_at)
+- `market_sale_items` (id, sale_id [FK ON DELETE CASCADE], product_id [FK ON DELETE SET NULL], product_name, unit_price, quantity, line_total)
+- `condominium_modules` (condominium_id [FK], module_key, enabled, PRIMARY KEY(condominium_id, module_key))
+- `app_features` (feature_key PRIMARY KEY, name, description, enabled)
+
+================================================================================
+8. ROTEIRO DE PERGUNTAS E RESPOSTAS TÉCNICAS DE CÓDIGO (Q&A)
+================================================================================
+
+P1: "Mostre no código onde o Singleton impede a criação de mais de uma conexão."
+R1: "Em server/config/DatabaseSingleton.js, linhas 17-19: no constructor da classe,
+verificamos se `DatabaseSingleton.instance` já existe. Se existir, retornamos a
+instância existente imediatamente sem chamar `new Database()`. Além disso, na
+linha 177 executamos `Object.freeze(instance)` para blindar a referência."
+
+P2: "Como você provou que o sistema reutiliza código através do Template Method?"
+R2: "Em server/dao/AbstractTenantDAO.js, implementei os métodos `unitTenantScope`
+e `directTenantScope`. Todos os 8 DAOs herdam de AbstractTenantDAO via `extends`.
+Quando o ResidentDAO ou FinancialDAO precisa filtrar por condomínio, eles apenas
+chamam `this.unitTenantScope(condominiumId)`, reutilizando 100% da lógica de
+montagem de SQL sem duplicar código."
+
+P3: "Onde está a garantia de que duas reservas não colidem?"
+R3: "Em server/services/templates/BusinessValidatorTemplate.js, na classe
+`ReservationConflictValidator`, método `checkUniquenessAndConflicts()`. O código
+executa uma consulta SQL com a condição:
+`WHERE space_id = ? AND reservation_date = ? AND start_time < ? AND end_time > ?`
+Se o retorno for maior que 0, lançamos exceção de conflito de horário antes da
+gravação no banco."
+
+P4: "O que impede que uma compra no PDV deixe o estoque negativo se o pagamento falhar?"
+R4: "Em server/dao/MarketDAO.js, método `checkout()`, encapsulei a validação de
+saldo, a baixa de estoque, o processamento de pagamento e o INSERT dos itens dentro
+do bloco `this.db.transaction(() => { ... })`. Se o processador de pagamento
+(PaymentTemplate) lançar qualquer erro, a transação inteira do SQLite sofre
+Rollback automático, restaurando o estoque original."
+
+P5: "Como funciona a segurança multi-tenant no sistema?"
+R5: "Implementamos Row-Level Multi-Tenancy. O middleware do Express intercepta o
+condomínio ativo e injeta no `req.condominiumId`. As consultas dos DAOs usam os
+métodos de escopo de `AbstractTenantDAO`, garantindo que um condomínio nunca enxergue
+ou altere blocos, moradores, veículos ou finanças de outro."
+================================================================================
