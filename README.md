@@ -189,9 +189,13 @@ npm run dev
 | **Financeiro** | `GET` | `/api/financial/summary` | Balanço consolidado de receitas e despesas |
 | | `GET` | `/api/financial/transactions` | Extrato de transações |
 | | `POST` | `/api/financial/transactions` | Lançamento de nova conta |
+| | `PATCH` | `/api/financial/transactions/:id` | Edição de lançamento não pago |
+| | `DELETE` | `/api/financial/transactions/:id` | Exclusão de lançamento não pago |
 | | `PATCH` | `/api/financial/transactions/:id/pay` | Baixa de pagamento |
 | **Comunicados** | `GET` | `/api/announcements` | Lista de avisos e comunicados |
 | | `POST` | `/api/announcements` | Publicação de novo comunicado |
+| | `PATCH` | `/api/announcements/:id` | Edição de comunicado |
+| | `DELETE` | `/api/announcements/:id` | Exclusão de comunicado |
 | **Mercadinho** | `GET` | `/api/market/products` | Catálogo de produtos e níveis de estoque |
 | | `POST` | `/api/market/checkout` | Conclusão de compra no autoatendimento |
 | | `PATCH` | `/api/market/products/:id/stock` | Ajuste manual ou reposição de estoque |

@@ -132,7 +132,18 @@ export class AnnouncementDAO {
     this.notifier = new AnnouncementNotificationDispatcher();
   }
 
-  getAnnouncements({ condominiumId, category, search } = {}) {
+  tenantScope(condominiumId) {
+    const condoId = parseInt(condominiumId, 10);
+    if (!Number.isInteger(condoId) || condoId <= 0) {
+      throw new Error('Condomínio inválido para esta operação.');
+    }
+    if (condoId === 1) {
+      return { sql: '(condominium_id = 1 OR condominium_id IS NULL)', params: [] };
+    }
+    return { sql: 'condominium_id = ?', params: [condoId] };
+  }
+
+  getAnnouncements({ condominiumId, category, priority, search } = {}) {
     let sql = 'SELECT * FROM announcements WHERE 1=1';
     const params = [];
 
@@ -149,6 +160,11 @@ export class AnnouncementDAO {
     if (category) {
       sql += ' AND category = ?';
       params.push(category);
+    }
+
+    if (priority) {
+      sql += ' AND LOWER(priority) = LOWER(?)';
+      params.push(priority);
     }
 
     if (search) {
@@ -187,9 +203,51 @@ export class AnnouncementDAO {
     return announcement;
   }
 
-  deleteAnnouncement(id) {
-    const stmt = this.db.prepare('DELETE FROM announcements WHERE id = ?');
-    const info = stmt.run(parseInt(id, 10));
+  updateAnnouncement(id, data, condominiumId) {
+    const scope = this.tenantScope(condominiumId);
+    const announcementId = parseInt(id, 10);
+    const existing = this.db.prepare(`
+      SELECT * FROM announcements
+      WHERE id = ? AND ${scope.sql}
+    `).get(announcementId, ...scope.params);
+    if (!existing) return null;
+
+    const updated = {
+      title: data.title ?? existing.title,
+      content: data.content ?? existing.content,
+      category: data.category ?? existing.category,
+      priority: data.priority ?? existing.priority,
+      author: data.author ?? existing.author,
+      target_block: data.target_block ?? existing.target_block,
+      is_pinned: data.is_pinned === undefined ? existing.is_pinned : (data.is_pinned ? 1 : 0),
+      expires_at: data.expires_at === undefined ? existing.expires_at : (data.expires_at || null)
+    };
+
+    this.db.prepare(`
+      UPDATE announcements
+      SET title = ?, content = ?, category = ?, priority = ?, author = ?,
+        target_block = ?, is_pinned = ?, expires_at = ?
+      WHERE id = ? AND ${scope.sql}
+    `).run(
+      updated.title,
+      updated.content,
+      updated.category,
+      updated.priority,
+      updated.author,
+      updated.target_block,
+      updated.is_pinned,
+      updated.expires_at,
+      announcementId,
+      ...scope.params
+    );
+
+    return this.db.prepare('SELECT * FROM announcements WHERE id = ?').get(announcementId);
+  }
+
+  deleteAnnouncement(id, condominiumId) {
+    const scope = this.tenantScope(condominiumId);
+    const stmt = this.db.prepare(`DELETE FROM announcements WHERE id = ? AND ${scope.sql}`);
+    const info = stmt.run(parseInt(id, 10), ...scope.params);
     return info.changes > 0;
   }
 }

@@ -11,20 +11,63 @@ export class FinancialDAO {
     this.reportGenerator = new FinancialReportGenerator(this.db);
   }
 
+  transactionScope(condominiumId) {
+    const condoId = parseInt(condominiumId, 10);
+    if (!Number.isInteger(condoId) || condoId <= 0) {
+      throw new Error('Condomínio inválido para esta operação.');
+    }
+    if (condoId === 1) {
+      return {
+        sql: '(f.condominium_id = 1 OR (f.condominium_id IS NULL AND (b.condominium_id = 1 OR u.block_id IS NULL)))',
+        params: []
+      };
+    }
+    return {
+      sql: '(f.condominium_id = ? OR (f.condominium_id IS NULL AND b.condominium_id = ?))',
+      params: [condoId, condoId]
+    };
+  }
+
+  getTransaction(id, condominiumId) {
+    const scope = this.transactionScope(condominiumId);
+    return this.db.prepare(`
+      SELECT f.*, f.id AS document_number, f.paid_at AS payment_date,
+        u.block, u.number AS unit_number
+      FROM financial_transactions f
+      LEFT JOIN units u ON f.unit_id = u.id
+      LEFT JOIN blocks b ON u.block_id = b.id
+      WHERE f.id = ? AND ${scope.sql}
+    `).get(parseInt(id, 10), ...scope.params) || null;
+  }
+
+  validateUnit(unitId, condominiumId) {
+    if (!unitId) return;
+    const condoId = parseInt(condominiumId, 10);
+    const unit = this.db.prepare(`
+      SELECT u.id
+      FROM units u
+      LEFT JOIN blocks b ON u.block_id = b.id
+      WHERE u.id = ? AND ${condoId === 1
+        ? '(b.condominium_id = 1 OR u.block_id IS NULL)'
+        : 'b.condominium_id = ?'}
+    `).get(...(condoId === 1 ? [parseInt(unitId, 10)] : [parseInt(unitId, 10), condoId]));
+    if (!unit) throw new Error('A unidade informada não pertence ao condomínio ativo.');
+  }
+
   getSummary({ condominiumId } = {}) {
-    let whereClause = 'WHERE 1=1';
+    const financialScope = condominiumId
+      ? this.transactionScope(condominiumId)
+      : { sql: '1=1', params: [] };
+    const whereClause = `WHERE ${financialScope.sql}`;
     let unitWhereClause = 'WHERE 1=1';
-    const params = [];
+    const params = [...financialScope.params];
     const unitParams = [];
 
     if (condominiumId) {
       const cId = parseInt(condominiumId, 10);
       if (cId === 1) {
-        whereClause += ' AND (f.condominium_id = 1 OR f.condominium_id IS NULL OR b.condominium_id = 1 OR u.block_id IS NULL)';
         unitWhereClause += ' AND (b.condominium_id = 1 OR u.block_id IS NULL)';
       } else {
-        whereClause += ' AND (f.condominium_id = ? OR b.condominium_id = ?)';
-        params.push(cId, cId);
         unitWhereClause += ' AND b.condominium_id = ?';
         unitParams.push(cId);
       }
@@ -87,25 +130,18 @@ export class FinancialDAO {
   }
 
   getTransactions({ condominiumId, status, type, category, search } = {}) {
+    const financialScope = condominiumId
+      ? this.transactionScope(condominiumId)
+      : { sql: '1=1', params: [] };
     let sql = `
       SELECT f.*, f.id AS document_number, f.paid_at AS payment_date,
         u.block, u.number as unit_number
       FROM financial_transactions f
       LEFT JOIN units u ON f.unit_id = u.id
       LEFT JOIN blocks b ON u.block_id = b.id
-      WHERE 1=1
+      WHERE ${financialScope.sql}
     `;
-    const params = [];
-
-    if (condominiumId) {
-      const cId = parseInt(condominiumId, 10);
-      if (cId === 1) {
-        sql += ' AND (f.condominium_id = 1 OR f.condominium_id IS NULL OR b.condominium_id = 1 OR u.block_id IS NULL)';
-      } else {
-        sql += ' AND (f.condominium_id = ? OR b.condominium_id = ?)';
-        params.push(cId, cId);
-      }
-    }
+    const params = [...financialScope.params];
 
     if (status) {
       sql += ' AND UPPER(f.status) = ?';
@@ -132,6 +168,7 @@ export class FinancialDAO {
   }
 
   createTransaction(data) {
+    this.validateUnit(data.unit_id, data.condominium_id);
     const stmt = this.db.prepare(`
       INSERT INTO financial_transactions (condominium_id, unit_id, description, amount, type, category, status, due_date)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -155,6 +192,72 @@ export class FinancialDAO {
       LEFT JOIN units u ON f.unit_id = u.id
       WHERE f.id = ?
     `).get(info.lastInsertRowid);
+  }
+
+  updateTransaction(id, data, condominiumId) {
+    const existing = this.getTransaction(id, condominiumId);
+    if (!existing) return null;
+    if (existing.status?.toUpperCase() === 'PAID') {
+      throw new Error('Lançamentos pagos não podem ser editados.');
+    }
+
+    const unitId = data.unit_id === undefined
+      ? existing.unit_id
+      : (data.unit_id ? parseInt(data.unit_id, 10) : null);
+    this.validateUnit(unitId, condominiumId);
+
+    const amount = Number(data.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('O valor do lançamento deve ser maior que zero.');
+    }
+    if (!['INCOME', 'EXPENSE'].includes(String(data.type).toUpperCase())) {
+      throw new Error('Tipo de lançamento inválido.');
+    }
+
+    const scope = this.transactionScope(condominiumId);
+    this.db.prepare(`
+      UPDATE financial_transactions
+      SET unit_id = ?, description = ?, amount = ?, type = ?, category = ?, due_date = ?
+      WHERE id = ? AND id IN (
+        SELECT f.id
+        FROM financial_transactions f
+        LEFT JOIN units u ON f.unit_id = u.id
+        LEFT JOIN blocks b ON u.block_id = b.id
+        WHERE f.id = ? AND ${scope.sql}
+      )
+    `).run(
+      unitId,
+      data.description,
+      amount,
+      String(data.type).toUpperCase(),
+      data.category,
+      data.due_date,
+      parseInt(id, 10),
+      parseInt(id, 10),
+      ...scope.params
+    );
+    return this.getTransaction(id, condominiumId);
+  }
+
+  deleteTransaction(id, condominiumId) {
+    const existing = this.getTransaction(id, condominiumId);
+    if (!existing) return false;
+    if (existing.status?.toUpperCase() === 'PAID') {
+      throw new Error('Lançamentos pagos não podem ser excluídos.');
+    }
+
+    const scope = this.transactionScope(condominiumId);
+    const result = this.db.prepare(`
+      DELETE FROM financial_transactions
+      WHERE id = ? AND id IN (
+        SELECT f.id
+        FROM financial_transactions f
+        LEFT JOIN units u ON f.unit_id = u.id
+        LEFT JOIN blocks b ON u.block_id = b.id
+        WHERE f.id = ? AND ${scope.sql}
+      )
+    `).run(parseInt(id, 10), parseInt(id, 10), ...scope.params);
+    return result.changes > 0;
   }
 
   payTransaction(id, condominiumId) {
