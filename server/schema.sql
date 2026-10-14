@@ -130,6 +130,8 @@ CREATE TABLE IF NOT EXISTS reservations (
     reservation_date DATE NOT NULL,
     start_time TEXT NOT NULL,
     end_time TEXT NOT NULL,
+    guests_count INTEGER DEFAULT 0,
+    notes TEXT,
     total_price REAL DEFAULT 0,
     status TEXT DEFAULT 'CONFIRMED',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -243,4 +245,4 @@ CREATE INDEX IF NOT EXISTS idx_condo_modules_lookup ON condominium_modules(condo
 -- Seed: Condomínio padrão (criado apenas se a tabela estiver vazia)
 INSERT INTO condominiums (id, name, status)
 SELECT 1, 'Condomínio Padrão', 'ACTIVE'
-WHERE NOT EXISTS (SELECT 1 FROM condominiums);
+WHERE NOT EXISTS (SELECT 1 FROM condominiums);

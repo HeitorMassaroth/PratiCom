@@ -480,6 +480,35 @@ app.get('/api/spaces', checkModuleAvailability('reservations'), (req, res) => {
   }
 });
 
+app.post('/api/spaces', checkModuleAvailability('reservations'), (req, res) => {
+  try {
+    const created = spaceDAO.createSpace({ ...req.body, condominium_id: req.condominiumId });
+    res.status(201).json(created);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch('/api/spaces/:id', checkModuleAvailability('reservations'), (req, res) => {
+  try {
+    const updated = spaceDAO.updateSpace(req.params.id, req.body);
+    res.json(updated);
+  } catch (err) {
+    const status = /não encontrada|não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.delete('/api/spaces/:id', checkModuleAvailability('reservations'), (req, res) => {
+  try {
+    spaceDAO.deleteSpace(req.params.id);
+    res.json({ message: 'Área removida com sucesso.' });
+  } catch (err) {
+    const status = /não encontrada|não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
 app.get('/api/reservations', checkModuleAvailability('reservations'), (req, res) => {
   try {
     const { space_id, date } = req.query;
@@ -499,7 +528,18 @@ app.post('/api/reservations', checkModuleAvailability('reservations'), (req, res
     const created = spaceDAO.createReservation(req.body);
     res.status(201).json(created);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const status = /não é permitido|inválida|não encontrado|não encontrada/i.test(err.message) ? 400 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.patch('/api/reservations/:id', checkModuleAvailability('reservations'), (req, res) => {
+  try {
+    const updated = spaceDAO.updateReservation(req.params.id, req.body);
+    res.json(updated);
+  } catch (err) {
+    const status = /não encontrada|não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -510,6 +550,16 @@ app.patch('/api/reservations/:id/cancel', checkModuleAvailability('reservations'
     res.json({ message: 'Reserva cancelada com sucesso.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/reservations/:id', checkModuleAvailability('reservations'), (req, res) => {
+  try {
+    spaceDAO.deleteReservation(req.params.id);
+    res.json({ message: 'Reserva excluída com sucesso.' });
+  } catch (err) {
+    const status = /não encontrada|não encontrado/i.test(err.message) ? 404 : 400;
+    res.status(status).json({ error: err.message });
   }
 });
 
