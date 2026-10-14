@@ -4,6 +4,7 @@ import {
   Plus,
   Pin,
   Trash2,
+  Pencil,
   AlertTriangle,
   Calendar,
   User,
@@ -14,6 +15,17 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 
+const EMPTY_ANNOUNCEMENT = {
+  title: '',
+  content: '',
+  priority: 'normal',
+  category: 'Geral',
+  author: 'Síndico Geral',
+  target_block: 'Todos',
+  is_pinned: false,
+  expires_at: ''
+};
+
 export default function AnnouncementsView({ showToast }) {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,16 +34,8 @@ export default function AnnouncementsView({ showToast }) {
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    priority: 'normal',
-    category: 'Geral',
-    author: 'Síndico Geral',
-    target_block: 'Todos',
-    is_pinned: false,
-    expires_at: ''
-  });
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  const [formData, setFormData] = useState(EMPTY_ANNOUNCEMENT);
 
   const loadData = async () => {
     try {
@@ -52,6 +56,33 @@ export default function AnnouncementsView({ showToast }) {
     loadData();
   }, [categoryFilter, priorityFilter]);
 
+  const openCreateModal = () => {
+    setEditingAnnouncement(null);
+    setFormData(EMPTY_ANNOUNCEMENT);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (announcement) => {
+    setEditingAnnouncement(announcement);
+    setFormData({
+      title: announcement.title || '',
+      content: announcement.content || '',
+      priority: announcement.priority || 'normal',
+      category: announcement.category || 'Geral',
+      author: announcement.author || 'Síndico Geral',
+      target_block: announcement.target_block || 'Todos',
+      is_pinned: Boolean(announcement.is_pinned),
+      expires_at: announcement.expires_at || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingAnnouncement(null);
+    setFormData(EMPTY_ANNOUNCEMENT);
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!formData.title || !formData.content) {
@@ -59,19 +90,14 @@ export default function AnnouncementsView({ showToast }) {
       return;
     }
     try {
-      await api.createAnnouncement(formData);
-      showToast('Comunicado publicado no mural com sucesso!', 'success');
-      setIsModalOpen(false);
-      setFormData({
-        title: '',
-        content: '',
-        priority: 'normal',
-        category: 'Geral',
-        author: 'Síndico Geral',
-        target_block: 'Todos',
-        is_pinned: false,
-        expires_at: ''
-      });
+      if (editingAnnouncement) {
+        await api.updateAnnouncement(editingAnnouncement.id, formData);
+        showToast('Comunicado atualizado com sucesso!', 'success');
+      } else {
+        await api.createAnnouncement(formData);
+        showToast('Comunicado publicado no mural com sucesso!', 'success');
+      }
+      closeModal();
       loadData();
     } catch (err) {
       showToast(err.message || 'Erro ao publicar comunicado.', 'danger');
@@ -122,7 +148,7 @@ export default function AnnouncementsView({ showToast }) {
           </select>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+        <button className="btn btn-primary" onClick={openCreateModal}>
           <Plus size={18} /> Publicar Novo Comunicado
         </button>
       </div>
@@ -174,6 +200,13 @@ export default function AnnouncementsView({ showToast }) {
                     </span>
                     <button
                       style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+                      title="Editar aviso"
+                      onClick={() => openEditModal(ann)}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
                       title="Excluir aviso"
                       onClick={() => handleDelete(ann.id, ann.title)}
                     >
@@ -213,9 +246,9 @@ export default function AnnouncementsView({ showToast }) {
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Megaphone size={20} color="var(--accent-primary)" /> Publicar Comunicado Oficial
+                <Megaphone size={20} color="var(--accent-primary)" /> {editingAnnouncement ? 'Editar Comunicado' : 'Publicar Comunicado Oficial'}
               </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsModalOpen(false)}>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeModal}>
                 <X size={20} />
               </button>
             </div>
@@ -316,11 +349,11 @@ export default function AnnouncementsView({ showToast }) {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Publicar Aviso
+                  {editingAnnouncement ? 'Salvar Alterações' : 'Publicar Aviso'}
                 </button>
               </div>
             </form>

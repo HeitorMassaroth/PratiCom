@@ -292,10 +292,13 @@ O Praticom ERP implementa conceitos de Linha de Produtos de Software através de
 | `GET` | `/api/financial/transactions`| `moduleGuard('financial')` | Lista transações e lançamentos | `FinancialDAO` |
 | `GET` | `/api/financial/summary` | `moduleGuard('financial')` | Balanço, receitas, despesas e inadimplência| `FinancialDAO` |
 | `POST` | `/api/financial/transactions`| `moduleGuard('financial')` | Cria novo lançamento financeiro | `FinancialDAO` |
+| `PATCH` | `/api/financial/transactions/:id` | `moduleGuard('financial')` | Edita lançamento não pago no condomínio ativo | `FinancialDAO` |
+| `DELETE` | `/api/financial/transactions/:id` | `moduleGuard('financial')` | Exclui lançamento não pago; pagos são preservados | `FinancialDAO` |
 | `PATCH` | `/api/financial/transactions/:id/pay` | `moduleGuard('financial')` | Registra quitação/baixa do lançamento | `FinancialDAO` |
 | `GET` | `/api/financial/report` | `moduleGuard('financial')` | Gera relatório consolidado (Template Method)| `FinancialDAO` |
 | `GET` | `/api/announcements` | `tenantContext` | Lista avisos e comunicados | `OperationsDAO` |
 | `POST` | `/api/announcements` | `tenantContext` | Cria novo comunicado no mural | `OperationsDAO` |
+| `PATCH` | `/api/announcements/:id` | `tenantContext` | Edita comunicado do condomínio ativo | `OperationsDAO` |
 | `DELETE` | `/api/announcements/:id` | `tenantContext` | Exclui comunicado | `OperationsDAO` |
 | `GET` | `/api/market/products` | `moduleGuard('market')` + LPS | Catálogo de produtos do mercadinho | `MarketDAO` |
 | `POST` | `/api/market/products` | `moduleGuard('market')` + LPS | Cadastra novo produto no mercadinho | `MarketDAO` |
@@ -334,9 +337,9 @@ A aplicação cliente está estruturada em 9 visões principais e componentes de
 Durante a auditoria arquitetural completa, foram identificados pontos críticos que exigem acompanhamento técnico:
 
 ### 9.1 Vulnerabilidade BOLA / IDOR em Métodos de Mutação
-* **Cenário:** Métodos de exclusão e atualização em rotas como `DELETE /api/access/:id`, `DELETE /api/residents/:id`, `PATCH /api/reservations/:id/cancel` e `DELETE /api/announcements/:id` executam queries SQL filtrando apenas pelo ID numérico (`WHERE id = ?`), sem validar se o registro pertence ao condomínio autenticado no header `X-Condominium-Id`.
+* **Cenário:** Algumas operações de exclusão e atualização, como `DELETE /api/access/:id`, `DELETE /api/residents/:id` e `PATCH /api/reservations/:id/cancel`, ainda precisam garantir que o registro pertence ao condomínio informado no header `X-Condominium-Id`. Avisos e operações financeiras de edição/exclusão agora aplicam escopo por condomínio.
 * **Risco:** Um usuário malicioso com acesso ao Condomínio A pode potencialmente excluir ou alterar registros do Condomínio B forjando o ID numérico.
-* **Solução:** Adicionar a validação de escopo territorial em todas as operações de mutação nas DAOs ou utilizar subqueries `WHERE id = ? AND condominium_id = ?`.
+* **Solução:** Aplicar validação de escopo territorial em todas as operações de mutação nas DAOs, considerando também relações hierárquicas e registros legados.
 
 ### 9.2 Restrição de Unicidade de Unidades (`units`)
 * **Cenário:** O schema define `UNIQUE(block, number)`. Como o campo `block` é uma string textual, dois condomínios diferentes que possuam um "Bloco A - Apto 101" colidem na restrição única do banco.

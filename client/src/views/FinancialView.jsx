@@ -13,7 +13,9 @@ import {
   CreditCard,
   Building,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -30,6 +32,7 @@ export default function FinancialView({ showToast }) {
 
   // Modais
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [formData, setFormData] = useState({
     type: 'income',
     category: 'Taxa Condominial',
@@ -62,28 +65,68 @@ export default function FinancialView({ showToast }) {
     loadData();
   }, [typeFilter, statusFilter, categoryFilter]);
 
-  const handleCreate = async (e) => {
+  const openCreateModal = () => {
+    setEditingTransaction(null);
+    setFormData({
+      type: 'income',
+      category: 'Taxa Condominial',
+      description: '',
+      amount: '',
+      due_date: new Date().toISOString().split('T')[0],
+      unit_id: '',
+      status: 'pending'
+    });
+    setIsNewModalOpen(true);
+  };
+
+  const openEditModal = (transaction) => {
+    setEditingTransaction(transaction);
+    setFormData({
+      type: transaction.type?.toLowerCase() || 'income',
+      category: transaction.category || 'Outros',
+      description: transaction.description || '',
+      amount: String(transaction.amount ?? ''),
+      due_date: transaction.due_date?.slice(0, 10) || '',
+      unit_id: transaction.unit_id ? String(transaction.unit_id) : '',
+      status: transaction.status?.toLowerCase() || 'pending'
+    });
+    setIsNewModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsNewModalOpen(false);
+    setEditingTransaction(null);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.description || !formData.amount || !formData.due_date) {
+    if (!formData.description.trim() || !formData.category || !formData.due_date || !Number.isFinite(Number(formData.amount)) || Number(formData.amount) <= 0) {
       showToast('Preencha os campos obrigatórios.', 'warning');
       return;
     }
     try {
-      await api.createFinancialTransaction(formData);
-      showToast('Lançamento financeiro registrado!', 'success');
-      setIsNewModalOpen(false);
-      setFormData({
-        type: 'income',
-        category: 'Taxa Condominial',
-        description: '',
-        amount: '',
-        due_date: new Date().toISOString().split('T')[0],
-        unit_id: '',
-        status: 'pending'
-      });
+      if (editingTransaction) {
+        await api.updateFinancialTransaction(editingTransaction.id, formData);
+        showToast('Lançamento atualizado com sucesso!', 'success');
+      } else {
+        await api.createFinancialTransaction(formData);
+        showToast('Lançamento financeiro registrado!', 'success');
+      }
+      closeModal();
       loadData();
     } catch (err) {
-      showToast(err.message || 'Erro ao registrar transação.', 'danger');
+      showToast(err.message || 'Erro ao salvar lançamento.', 'danger');
+    }
+  };
+
+  const handleDelete = async (transaction) => {
+    if (!window.confirm(`Excluir o lançamento "${transaction.description}" no valor de R$ ${Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}?`)) return;
+    try {
+      await api.deleteFinancialTransaction(transaction.id);
+      showToast('Lançamento excluído.', 'info');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao excluir lançamento.', 'danger');
     }
   };
 
@@ -231,7 +274,7 @@ export default function FinancialView({ showToast }) {
           </select>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
+        <button className="btn btn-primary" onClick={openCreateModal}>
           <Plus size={18} /> Novo Lançamento Financeiro
         </button>
       </div>
@@ -299,12 +342,17 @@ export default function FinancialView({ showToast }) {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {tx.status?.toUpperCase() !== 'PAID' ? (
-                        <button
-                          className="btn btn-success btn-sm"
-                          onClick={() => handlePay(tx.id)}
-                        >
-                          <CheckCircle2 size={14} /> Dar Baixa
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <button className="btn btn-secondary btn-sm" title="Editar lançamento" onClick={() => openEditModal(tx)}>
+                            <Pencil size={14} /> Editar
+                          </button>
+                          <button className="btn btn-danger btn-sm" title="Excluir lançamento" onClick={() => handleDelete(tx)}>
+                            <Trash2 size={14} /> Excluir
+                          </button>
+                          <button className="btn btn-success btn-sm" onClick={() => handlePay(tx.id)}>
+                            <CheckCircle2 size={14} /> Dar Baixa
+                          </button>
+                        </div>
                       ) : (
                         <button
                           className="btn btn-secondary btn-sm"
@@ -329,13 +377,13 @@ export default function FinancialView({ showToast }) {
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <DollarSign size={20} color="var(--accent-primary)" /> Novo Lançamento Financeiro
+                <DollarSign size={20} color="var(--accent-primary)" /> {editingTransaction ? 'Editar Lançamento Financeiro' : 'Novo Lançamento Financeiro'}
               </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsNewModalOpen(false)}>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeModal}>
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div className="form-row">
                   <div className="form-group">
@@ -421,27 +469,29 @@ export default function FinancialView({ showToast }) {
                     </select>
                   </div>
 
-                  <div className="form-group">
-                    <label>Status Inicial</label>
-                    <select
-                      className="form-control"
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    >
-                      <option value="pending">Pendente</option>
-                      <option value="paid">Já Pago / Quitado</option>
-                      <option value="overdue">Vencido</option>
-                    </select>
-                  </div>
+                  {!editingTransaction && (
+                    <div className="form-group">
+                      <label>Status Inicial</label>
+                      <select
+                        className="form-control"
+                        value={formData.status}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      >
+                        <option value="pending">Pendente</option>
+                        <option value="paid">Já Pago / Quitado</option>
+                        <option value="overdue">Vencido</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsNewModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Registrar Lançamento
+                  {editingTransaction ? 'Salvar Alterações' : 'Registrar Lançamento'}
                 </button>
               </div>
             </form>

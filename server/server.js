@@ -588,13 +588,45 @@ app.get('/api/financial/summary', checkModuleAvailability('financial'), (req, re
 app.post('/api/financial/transactions', checkModuleAvailability('financial'), (req, res) => {
   try {
     const { type, category, description, amount, due_date } = req.body;
-    if (!type || !category || !description || !amount || !due_date) {
+    if (!type || !category || !description?.trim() || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !due_date) {
       return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
     }
-    const created = financialDAO.createTransaction({ condominium_id: req.condominiumId, ...req.body });
+    if (!['income', 'expense'].includes(String(type).toLowerCase())) {
+      return res.status(400).json({ error: 'Tipo de lançamento inválido.' });
+    }
+    const created = financialDAO.createTransaction({ ...req.body, condominium_id: req.condominiumId });
     res.status(201).json(created);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const status = /unidade informada/i.test(err.message) ? 400 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.patch('/api/financial/transactions/:id', checkModuleAvailability('financial'), (req, res) => {
+  try {
+    const { type, category, description, amount, due_date } = req.body;
+    if (!['income', 'expense'].includes(String(type).toLowerCase()) || !category || !description?.trim() || !Number.isFinite(Number(amount)) || Number(amount) <= 0 || !due_date) {
+      return res.status(400).json({ error: 'Preencha corretamente os campos obrigatórios.' });
+    }
+    const updated = financialDAO.updateTransaction(req.params.id, req.body, req.condominiumId);
+    if (!updated) return res.status(404).json({ error: 'Lançamento não encontrado neste condomínio.' });
+    res.json(updated);
+  } catch (err) {
+    const status = /não encontrado/i.test(err.message) ? 404
+      : /não podem ser editados/i.test(err.message) ? 409
+        : /unidade informada|valor do lançamento|tipo de lançamento/i.test(err.message) ? 400 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+app.delete('/api/financial/transactions/:id', checkModuleAvailability('financial'), (req, res) => {
+  try {
+    const deleted = financialDAO.deleteTransaction(req.params.id, req.condominiumId);
+    if (!deleted) return res.status(404).json({ error: 'Lançamento não encontrado neste condomínio.' });
+    res.json({ message: 'Lançamento excluído com sucesso.' });
+  } catch (err) {
+    const status = /não podem ser excluídos/i.test(err.message) ? 409 : 500;
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -626,8 +658,8 @@ app.get('/api/financial/report', checkModuleAvailability('financial'), (req, res
 // ==========================================
 app.get('/api/announcements', (req, res) => {
   try {
-    const { category, search } = req.query;
-    const announcements = announcementDAO.getAnnouncements({ condominiumId: req.condominiumId, category, search });
+    const { category, priority, search } = req.query;
+    const announcements = announcementDAO.getAnnouncements({ condominiumId: req.condominiumId, category, priority, search });
     res.json(announcements);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -640,8 +672,22 @@ app.post('/api/announcements', (req, res) => {
     if (!title || !content) {
       return res.status(400).json({ error: 'Título e conteúdo são obrigatórios.' });
     }
-    const created = announcementDAO.createAnnouncement({ condominium_id: req.condominiumId, ...req.body });
+    const created = announcementDAO.createAnnouncement({ ...req.body, condominium_id: req.condominiumId });
     res.status(201).json(created);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/announcements/:id', (req, res) => {
+  try {
+    const { title, content } = req.body;
+    if (!title?.trim() || !content?.trim()) {
+      return res.status(400).json({ error: 'Título e conteúdo são obrigatórios.' });
+    }
+    const updated = announcementDAO.updateAnnouncement(req.params.id, req.body, req.condominiumId);
+    if (!updated) return res.status(404).json({ error: 'Comunicado não encontrado neste condomínio.' });
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -650,7 +696,8 @@ app.post('/api/announcements', (req, res) => {
 app.delete('/api/announcements/:id', (req, res) => {
   try {
     const { id } = req.params;
-    announcementDAO.deleteAnnouncement(id);
+    const deleted = announcementDAO.deleteAnnouncement(id, req.condominiumId);
+    if (!deleted) return res.status(404).json({ error: 'Comunicado não encontrado neste condomínio.' });
     res.json({ message: 'Comunicado excluído com sucesso.' });
   } catch (err) {
     res.status(500).json({ error: err.message });

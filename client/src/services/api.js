@@ -122,6 +122,8 @@ export const api = {
     return request(`/financial/transactions${qs ? '?' + qs : ''}`);
   },
   createFinancialTransaction: (data) => request('/financial/transactions', { method: 'POST', body: JSON.stringify(data) }),
+  updateFinancialTransaction: (id, data) => request(`/financial/transactions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteFinancialTransaction: (id) => request(`/financial/transactions/${id}`, { method: 'DELETE' }),
   payFinancialTransaction: (id) => request(`/financial/transactions/${id}/pay`, { method: 'PATCH' }),
 
   // Comunicados
@@ -130,6 +132,7 @@ export const api = {
     return request(`/announcements${qs ? '?' + qs : ''}`);
   },
   createAnnouncement: (data) => request('/announcements', { method: 'POST', body: JSON.stringify(data) }),
+  updateAnnouncement: (id, data) => request(`/announcements/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteAnnouncement: (id) => request(`/announcements/${id}`, { method: 'DELETE' }),
 
   // Mercadinho
