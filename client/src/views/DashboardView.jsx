@@ -22,6 +22,12 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
   const urgentAnnouncements = data?.urgentAnnouncements || [];
   const upcomingReservations = data?.upcomingReservations || [];
 
+  const formatTime = (ts) => {
+    if (!ts) return '-';
+    const parsed = new Date(typeof ts === 'string' ? ts.replace(' ', 'T') : ts);
+    return isNaN(parsed.getTime()) ? '-' : parsed.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div>
       {/* Banner de Boas-Vindas */}
@@ -82,7 +88,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
           </div>
           <div className="metric-info">
             <h4>Pessoas no Condomínio</h4>
-            <div className="value">{metrics.activeVisitors ?? 0}</div>
+            <div className="value">{metrics.activeVisitors ?? metrics.activeAccess ?? 0}</div>
             <div className="subtext">Visitantes & Prestadores ativos</div>
           </div>
         </div>
@@ -161,7 +167,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
                           <span className="badge badge-info">{log.type}</span>
                         </td>
                         <td>{log.block ? `${log.block} - Apto ${log.unit_number}` : 'Área Geral'}</td>
-                        <td>{new Date(log.entered_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td>{formatTime(log.entered_at || log.entry_time)}</td>
                         <td>
                           {log.status === 'inside' ? (
                             <span className="badge badge-warning">No Condomínio</span>
@@ -272,7 +278,7 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
                       </span>
                     </div>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                      {ann.content.slice(0, 120)}...
+                      {ann.content ? (ann.content.length > 120 ? `${ann.content.slice(0, 120)}...` : ann.content) : ''}
                     </p>
                   </div>
                 ))

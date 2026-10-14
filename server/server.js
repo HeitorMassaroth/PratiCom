@@ -93,6 +93,7 @@ app.get('/api/dashboard', checkModuleAvailability('dashboard'), async (req, res)
     const hasAccess = condominiumDAO.isModuleEnabled(condominiumId, 'access');
     const hasFinancial = condominiumDAO.isModuleEnabled(condominiumId, 'financial');
     const hasReservations = condominiumDAO.isModuleEnabled(condominiumId, 'reservations');
+    const hasMarket = condominiumDAO.isModuleEnabled(condominiumId, 'market');
 
     const deliveries = hasDeliveries ? deliveryDAO.getDeliveries({ condominiumId }) : [];
     const pendingDeliveries = deliveries.filter(d => ['pending', 'PENDING', 'RECEBIDA'].includes(d.status));
@@ -100,19 +101,29 @@ app.get('/api/dashboard', checkModuleAvailability('dashboard'), async (req, res)
     const accessLogs = hasAccess ? accessDAO.getAccessLogs({ condominiumId }) : [];
     const activeAccess = accessLogs.filter(a => a.status === 'IN_PROPERTY' || a.status === 'inside');
 
-    const summary = hasFinancial ? financialDAO.getSummary({ condominiumId }) : { default_amount: 0, default_rate: 0 };
+    const summary = hasFinancial ? financialDAO.getSummary({ condominiumId }) : null;
 
     const announcements = announcementDAO.getAnnouncements({ condominiumId });
     const urgentAnnouncements = announcements.filter(a => a.priority === 'URGENTE' || a.priority === 'high');
 
+    const today = new Date().toLocaleDateString('en-CA');
     const reservations = hasReservations ? spaceDAO.getReservations({ condominiumId }) : [];
+    const todayReservations = reservations.filter(r => r.reservation_date === today && (r.status === 'CONFIRMED' || r.status === 'Confirmada'));
+
+    const marketProducts = hasMarket ? marketDAO.getProducts({ condominiumId }) : [];
+    const lowStockItems = marketProducts.filter(p => (p.stock_quantity ?? p.stock ?? 0) <= (p.min_stock ?? 5));
 
     const data = {
       metrics: {
         pendingDeliveries: hasDeliveries ? pendingDeliveries.length : null,
         activeAccess: hasAccess ? activeAccess.length : null,
-        overdueAmount: hasFinancial ? (summary.default_amount || 0) : null,
-        defaultRate: hasFinancial ? (summary.default_rate || 0) : null
+        activeVisitors: hasAccess ? activeAccess.length : null,
+        balance: hasFinancial ? (summary?.currentBalance ?? 0) : null,
+        overdueAmount: hasFinancial ? (summary?.default_amount ?? summary?.income?.overdue ?? 0) : null,
+        overdueCount: hasFinancial ? (summary?.overdue_count ?? summary?.delinquencyByUnit?.length ?? 0) : null,
+        defaultRate: hasFinancial ? (summary?.default_rate ?? 0) : null,
+        todayReservations: hasReservations ? todayReservations.length : null,
+        lowStockItems: hasMarket ? lowStockItems.length : null
       },
       recentAccess: activeAccess.slice(0, 5),
       recentDeliveries: pendingDeliveries.slice(0, 5),
