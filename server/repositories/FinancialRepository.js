@@ -1,4 +1,5 @@
 import { BaseRepository } from './BaseRepository.js';
+import { FinancialTransaction } from '../domain/index.js';
 
 /**
  * Repositório especializado para a entidade FinancialTransaction.
@@ -7,6 +8,13 @@ import { BaseRepository } from './BaseRepository.js';
 export class FinancialRepository extends BaseRepository {
   constructor() {
     super('financial_transactions', { primaryKey: 'id', tenantColumn: 'condominium_id', isTenantDirect: true });
+  }
+
+  /**
+   * Converte registro de banco para a entidade de domínio FinancialTransaction.
+   */
+  toDomain(row) {
+    return FinancialTransaction.fromDatabase(row);
   }
 
   /**

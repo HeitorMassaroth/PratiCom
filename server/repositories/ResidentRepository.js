@@ -1,4 +1,5 @@
 import { BaseRepository } from './BaseRepository.js';
+import { Resident } from '../domain/index.js';
 
 /**
  * Repositório especializado para a entidade Resident e Vehicle.
@@ -7,6 +8,13 @@ import { BaseRepository } from './BaseRepository.js';
 export class ResidentRepository extends BaseRepository {
   constructor() {
     super('residents', { primaryKey: 'id', tenantColumn: 'condominium_id', isTenantDirect: false });
+  }
+
+  /**
+   * Converte registro de banco para a entidade de domínio Resident.
+   */
+  toDomain(row) {
+    return Resident.fromDatabase(row);
   }
 
   /**

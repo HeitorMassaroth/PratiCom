@@ -63,6 +63,18 @@ const residents = resRepo.findWithUnitDetails({ condominiumId: 1 });
 assert(Array.isArray(residents), 'Deve retornar array de moradores');
 console.log(`  ✅ [PASS] ResidentRepository.findWithUnitDetails() retornou ${residents.length} moradores com JOIN de unidades`);
 
+if (residents.length > 0) {
+  const residentEntity = resRepo.toDomain(residents[0]);
+  assert(residentEntity.name, 'Entidade de domínio deve possuir nome');
+  assert.equal(typeof residentEntity.isOwner, 'function', 'Deve possuir método de negócio isOwner');
+  console.log(`  ✅ [PASS] ResidentRepository.toDomain() hidrata Entidade Resident com sucesso (${residentEntity.name})`);
+}
+
+const delRepo = RepositoryFactory.getRepository('deliveries');
+const deliveryEntity = delRepo.toDomain({ unit_id: 1, courier: 'Correios', pickup_code: '1234' });
+assert.equal(deliveryEntity.verifyPin('1234'), true, 'Entidade Delivery deve validar PIN');
+console.log('  ✅ [PASS] DeliveryRepository.toDomain() hidrata Entidade Delivery com sucesso');
+
 console.log('\n====================================================');
 console.log('🎉 TODAS AS VALIDAÇÕES DO PADRÃO REPOSITORY APROVADAS!');
 console.log('====================================================\n');

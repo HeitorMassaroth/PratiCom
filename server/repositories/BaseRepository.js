@@ -52,13 +52,20 @@ export class BaseRepository extends AbstractTenantDAO {
 
     for (const [col, val] of Object.entries(where)) {
       if (val !== undefined && val !== null) {
+        if (!/^[a-zA-Z0-9_]+$/.test(col)) {
+          throw new Error(`Identificador de coluna inválido no filtro: ${col}`);
+        }
         sql += ` AND ${col} = ?`;
         params.push(val);
       }
     }
 
     if (orderBy) {
-      sql += ` ORDER BY ${orderBy}`;
+      const trimmedOrder = String(orderBy).trim();
+      if (!/^[a-zA-Z0-9_]+(\s+(ASC|DESC))?$/i.test(trimmedOrder)) {
+        throw new Error(`Cláusula ORDER BY inválida: ${orderBy}`);
+      }
+      sql += ` ORDER BY ${trimmedOrder}`;
     }
 
     if (Number.isInteger(limit) && limit > 0) {
@@ -84,7 +91,12 @@ export class BaseRepository extends AbstractTenantDAO {
       throw new Error(`Nenhum campo fornecido para inserção em ${this.tableName}.`);
     }
 
-    const columns = filteredEntries.map(([k]) => k);
+    const columns = filteredEntries.map(([k]) => {
+      if (!/^[a-zA-Z0-9_]+$/.test(k)) {
+        throw new Error(`Identificador de coluna inválido para inserção: ${k}`);
+      }
+      return k;
+    });
     const placeholders = columns.map(() => '?').join(', ');
     const values = filteredEntries.map(([_, v]) => v);
 
@@ -108,7 +120,12 @@ export class BaseRepository extends AbstractTenantDAO {
       return existing;
     }
 
-    const setClauses = filteredEntries.map(([k]) => `${k} = ?`).join(', ');
+    const setClauses = filteredEntries.map(([k]) => {
+      if (!/^[a-zA-Z0-9_]+$/.test(k)) {
+        throw new Error(`Identificador de coluna inválido para atualização: ${k}`);
+      }
+      return `${k} = ?`;
+    }).join(', ');
     const values = filteredEntries.map(([_, v]) => v);
     values.push(existing[this.primaryKey]);
 
@@ -145,6 +162,9 @@ export class BaseRepository extends AbstractTenantDAO {
 
     for (const [col, val] of Object.entries(where)) {
       if (val !== undefined && val !== null) {
+        if (!/^[a-zA-Z0-9_]+$/.test(col)) {
+          throw new Error(`Identificador de coluna inválido em count: ${col}`);
+        }
         sql += ` AND ${col} = ?`;
         params.push(val);
       }

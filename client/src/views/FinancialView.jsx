@@ -18,6 +18,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
+import CrudModal from '../components/CrudModal';
 
 export default function FinancialView({ showToast }) {
   const [transactions, setTransactions] = useState([]);
@@ -372,132 +373,114 @@ export default function FinancialView({ showToast }) {
       </div>
 
       {/* Modal: Novo Lançamento Financeiro */}
-      {isNewModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <DollarSign size={20} color="var(--accent-primary)" /> {editingTransaction ? 'Editar Lançamento Financeiro' : 'Novo Lançamento Financeiro'}
-              </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeModal}>
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Tipo de Transação *</label>
-                    <select
-                      className="form-control"
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    >
-                      <option value="income">Receita / Entrada (+)</option>
-                      <option value="expense">Despesa / Saída (-)</option>
-                    </select>
-                  </div>
+      <CrudModal
+        isOpen={isNewModalOpen}
+        onClose={closeModal}
+        title={editingTransaction ? 'Editar Lançamento Financeiro' : 'Novo Lançamento Financeiro'}
+        icon={DollarSign}
+        onSubmit={handleSubmit}
+        submitText={editingTransaction ? 'Salvar Alterações' : 'Registrar Lançamento'}
+      >
+        <div className="form-row">
+          <div className="form-group">
+            <label>Tipo de Transação *</label>
+            <select
+              className="form-control"
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+            >
+              <option value="income">Receita / Entrada (+)</option>
+              <option value="expense">Despesa / Saída (-)</option>
+            </select>
+          </div>
 
-                  <div className="form-group">
-                    <label>Categoria *</label>
-                    <select
-                      className="form-control"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    >
-                      <option value="Taxa Condominial">Taxa Condominial</option>
-                      <option value="Manutenção">Manutenção</option>
-                      <option value="Água/Luz">Água / Luz / Gás</option>
-                      <option value="Salários">Salários & Portaria</option>
-                      <option value="Mercadinho">Mercadinho</option>
-                      <option value="Reserva de Espaço">Reserva de Espaço</option>
-                      <option value="Outros">Outros</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Descrição do Lançamento *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    required
-                    placeholder="Ex: Taxa Condominial Ref. 09/2026, Troca de lâmpadas LED..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Valor (R$) *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="form-control"
-                      required
-                      placeholder="0.00"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Data de Vencimento *</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      required
-                      value={formData.due_date}
-                      onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Vincular à Unidade (Opcional)</label>
-                    <select
-                      className="form-control"
-                      value={formData.unit_id}
-                      onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
-                    >
-                      <option value="">Nenhuma / Geral do Condomínio</option>
-                      {units.map((u) => (
-                        <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {!editingTransaction && (
-                    <div className="form-group">
-                      <label>Status Inicial</label>
-                      <select
-                        className="form-control"
-                        value={formData.status}
-                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      >
-                        <option value="pending">Pendente</option>
-                        <option value="paid">Já Pago / Quitado</option>
-                        <option value="overdue">Vencido</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingTransaction ? 'Salvar Alterações' : 'Registrar Lançamento'}
-                </button>
-              </div>
-            </form>
+          <div className="form-group">
+            <label>Categoria *</label>
+            <select
+              className="form-control"
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            >
+              <option value="Taxa Condominial">Taxa Condominial</option>
+              <option value="Manutenção">Manutenção</option>
+              <option value="Água/Luz">Água / Luz / Gás</option>
+              <option value="Salários">Salários & Portaria</option>
+              <option value="Mercadinho">Mercadinho</option>
+              <option value="Reserva de Espaço">Reserva de Espaço</option>
+              <option value="Outros">Outros</option>
+            </select>
           </div>
         </div>
-      )}
+
+        <div className="form-group">
+          <label>Descrição do Lançamento *</label>
+          <input
+            type="text"
+            className="form-control"
+            required
+            placeholder="Ex: Taxa Condominial Ref. 09/2026, Troca de lâmpadas LED..."
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          />
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Valor (R$) *</label>
+            <input
+              type="number"
+              step="0.01"
+              className="form-control"
+              required
+              placeholder="0.00"
+              value={formData.amount}
+              onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Data de Vencimento *</label>
+            <input
+              type="date"
+              className="form-control"
+              required
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Vincular à Unidade (Opcional)</label>
+            <select
+              className="form-control"
+              value={formData.unit_id}
+              onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
+            >
+              <option value="">Nenhuma / Geral do Condomínio</option>
+              {units.map((u) => (
+                <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
+              ))}
+            </select>
+          </div>
+
+          {!editingTransaction && (
+            <div className="form-group">
+              <label>Status Inicial</label>
+              <select
+                className="form-control"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              >
+                <option value="pending">Pendente</option>
+                <option value="paid">Já Pago / Quitado</option>
+                <option value="overdue">Vencido</option>
+              </select>
+            </div>
+          )}
+        </div>
+      </CrudModal>
     </div>
   );
 }

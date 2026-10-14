@@ -1,4 +1,5 @@
 import { BaseRepository } from './BaseRepository.js';
+import { Delivery } from '../domain/index.js';
 
 /**
  * Repositório especializado para a entidade Delivery.
@@ -7,6 +8,13 @@ import { BaseRepository } from './BaseRepository.js';
 export class DeliveryRepository extends BaseRepository {
   constructor() {
     super('deliveries', { primaryKey: 'id', tenantColumn: 'condominium_id', isTenantDirect: false });
+  }
+
+  /**
+   * Converte registro de banco para a entidade de domínio Delivery.
+   */
+  toDomain(row) {
+    return Delivery.fromDatabase(row);
   }
 
   /**

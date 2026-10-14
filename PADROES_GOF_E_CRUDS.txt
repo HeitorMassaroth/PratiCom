@@ -385,7 +385,30 @@ FLUXOS RELACIONAIS DE PERSISTÊNCIA ADICIONAIS
     - Função: Habilitação/desabilitação global de funcionalidades do ERP em tempo de execução.
 
 ================================================================================
-3. INDEPENDÊNCIA E DIRETRIZES TÉCNICAS
+3. AS 10 ENTIDADES DE DOMÍNIO (ORIENTAÇÃO A OBJETOS & DDD)
+================================================================================
+O sistema implementa 10 Entidades de Domínio puras em `server/domain/entities/*`,
+todas estendendo `BaseDomainEntity`, encapsulando atributos de negócio, validações
+de integridade (`validate()`) e métodos comportamentais:
+
+1. Condominium (server/domain/entities/Condominium.js): Tenant raiz, estado ativo/inativo, validação.
+2. Block (server/domain/entities/Block.js): Divisão territorial, normalização de nome.
+3. Unit (server/domain/entities/Unit.js): Unidade residencial/comercial, identificador composto.
+4. Resident (server/domain/entities/Resident.js): Morador, detecção de proprietário/inquilino, contato emergencial.
+5. Vehicle (server/domain/entities/Vehicle.js): Veículo, normalização de placa Mercosul/antiga, tipo.
+6. Delivery (server/domain/entities/Delivery.js): Encomenda, conferência segura de PIN, baixa e cancelamento.
+7. AccessLog (server/domain/entities/AccessLog.js): Portaria, registro de saída, cálculo de permanência em minutos.
+8. Reservation (server/domain/entities/Reservation.js): Reserva de área comum, detecção de conflitos, cálculo de duração.
+9. FinancialTransaction (server/domain/entities/FinancialTransaction.js): Receitas/despesas, quitação e vencimento.
+10. Announcement (server/domain/entities/Announcement.js): Mural de avisos, prioridade e expiração temporal.
+
+Integração com Padrões GoF:
+- Validação no Template Method: `EntityOperationTemplate` e `BusinessValidatorTemplate` utilizam as entidades de domínio para garantir a integridade dos dados antes da persistência.
+- Hidratação nos Repositórios: `ResidentRepository`, `DeliveryRepository` e `FinancialRepository` fornecem o método `toDomain(row)` para converter linhas relacionais em entidades ricas.
+- Zero quebra: Retornos para a API mantêm compatibilidade total via método `toJSON()`.
+
+================================================================================
+4. INDEPENDÊNCIA E DIRETRIZES TÉCNICAS
 ================================================================================
 - Persistência: 100% SQLite relacional com chaves estrangeiras ativas.
 - Dependência de JSONs de dados: Zero. Nenhum arquivo .json é utilizado para persistir dados.

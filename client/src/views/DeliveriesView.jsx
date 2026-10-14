@@ -16,6 +16,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
+import CrudModal from '../components/CrudModal';
 
 const EMPTY_DELIVERY = {
   unit_id: '',
@@ -321,180 +322,153 @@ export default function DeliveriesView({ showToast }) {
       </div>
 
       {/* Modal: Novo Recebimento de Pacote */}
-      {isNewModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {editingDelivery
-                  ? <><Pencil size={20} color="var(--accent-primary)" /> Editar Encomenda</>
-                  : <><Package size={20} color="var(--accent-primary)" /> Registrar Encomenda</>
-                }
-              </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeDeliveryModal}>
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Unidade de Destino *</label>
-                  <select
-                    className="form-control"
-                    required
-                    value={formData.unit_id}
-                    onChange={(e) => setFormData({ ...formData, unit_id: e.target.value, resident_id: '' })}
-                  >
-                    <option value="">Selecione o Apartamento</option>
-                    {units.map((u) => (
-                      <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
-                    ))}
-                  </select>
-                </div>
+      <CrudModal
+        isOpen={isNewModalOpen}
+        onClose={closeDeliveryModal}
+        title={editingDelivery ? 'Editar Encomenda' : 'Registrar Encomenda'}
+        icon={editingDelivery ? Pencil : Package}
+        onSubmit={handleSubmit}
+        submitText={editingDelivery ? 'Salvar Alterações' : 'Registrar e Gerar PIN'}
+      >
+        <div className="form-group">
+          <label>Unidade de Destino *</label>
+          <select
+            className="form-control"
+            required
+            value={formData.unit_id}
+            onChange={(e) => setFormData({ ...formData, unit_id: e.target.value, resident_id: '' })}
+          >
+            <option value="">Selecione o Apartamento</option>
+            {units.map((u) => (
+              <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
+            ))}
+          </select>
+        </div>
 
-                {formData.unit_id && (
-                  <div className="form-group">
-                    <label>Morador Destinatário (Opcional)</label>
-                    <select
-                      className="form-control"
-                      value={formData.resident_id}
-                      onChange={(e) => setFormData({ ...formData, resident_id: e.target.value })}
-                    >
-                      <option value="">Morador / Toda Unidade</option>
-                      {availableResidentsForUnit.map((r) => (
-                        <option key={r.id} value={r.id}>{r.name} ({r.role})</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+        {formData.unit_id && (
+          <div className="form-group">
+            <label>Morador Destinatário (Opcional)</label>
+            <select
+              className="form-control"
+              value={formData.resident_id}
+              onChange={(e) => setFormData({ ...formData, resident_id: e.target.value })}
+            >
+              <option value="">Morador / Toda Unidade</option>
+              {availableResidentsForUnit.map((r) => (
+                <option key={r.id} value={r.id}>{r.name} ({r.role})</option>
+              ))}
+            </select>
+          </div>
+        )}
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Empresa / Transportadora *</label>
-                    <select
-                      className="form-control"
-                      value={formData.courier}
-                      onChange={(e) => setFormData({ ...formData, courier: e.target.value })}
-                    >
-                      <option value="Mercado Livre">Mercado Livre</option>
-                      <option value="Amazon Brasil">Amazon Brasil</option>
-                      <option value="Correios (SEDEX / PAC)">Correios</option>
-                      <option value="Shopee">Shopee</option>
-                      <option value="Magalu">Magalu</option>
-                      <option value="iFood">iFood</option>
-                      <option value="Transportadora Jadlog">Jadlog</option>
-                      <option value="Outra Transportadora">Outra</option>
-                    </select>
-                  </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Empresa / Transportadora *</label>
+            <select
+              className="form-control"
+              value={formData.courier}
+              onChange={(e) => setFormData({ ...formData, courier: e.target.value })}
+            >
+              <option value="Mercado Livre">Mercado Livre</option>
+              <option value="Amazon Brasil">Amazon Brasil</option>
+              <option value="Correios (SEDEX / PAC)">Correios</option>
+              <option value="Shopee">Shopee</option>
+              <option value="Magalu">Magalu</option>
+              <option value="iFood">iFood</option>
+              <option value="Transportadora Jadlog">Jadlog</option>
+              <option value="Outra Transportadora">Outra</option>
+            </select>
+          </div>
 
-                  <div className="form-group">
-                    <label>Código de Rastreio</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Ex: BR123456789"
-                      value={formData.tracking_code}
-                      onChange={(e) => setFormData({ ...formData, tracking_code: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Descrição do Pacote / Volume</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Ex: Caixa média Mercado Livre, Envelope lacrado..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Observações da Portaria</label>
-                  <textarea
-                    className="form-control"
-                    rows="2"
-                    placeholder="Ex: Deixado na gaveta 3 da portaria"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  ></textarea>
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={closeDeliveryModal}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingDelivery ? 'Salvar Alterações' : 'Registrar e Gerar PIN'}
-                </button>
-              </div>
-            </form>
+          <div className="form-group">
+            <label>Código de Rastreio</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Ex: BR123456789"
+              value={formData.tracking_code}
+              onChange={(e) => setFormData({ ...formData, tracking_code: e.target.value })}
+            />
           </div>
         </div>
-      )}
+
+        <div className="form-group">
+          <label>Descrição do Pacote / Volume</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Ex: Caixa média Mercado Livre, Envelope lacrado..."
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Observações da Portaria</label>
+          <textarea
+            className="form-control"
+            rows="2"
+            placeholder="Ex: Deixado na gaveta 3 da portaria"
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          ></textarea>
+        </div>
+      </CrudModal>
 
       {/* Modal: Confirmar Baixa / Retirada */}
-      {isPickupModalOpen && selectedDelivery && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CheckCircle size={20} color="var(--accent-success)" /> Baixa de Encomenda
-              </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsPickupModalOpen(false)}>
-                <X size={20} />
+      {selectedDelivery && (
+        <CrudModal
+          isOpen={isPickupModalOpen}
+          onClose={() => setIsPickupModalOpen(false)}
+          title="Baixa de Encomenda"
+          icon={CheckCircle}
+          iconColor="var(--accent-success)"
+          onSubmit={handlePickup}
+          customFooter={(
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsPickupModalOpen(false)}>
+                Cancelar
               </button>
-            </div>
-            <form onSubmit={handlePickup}>
-              <div className="modal-body">
-                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '18px' }}>
-                  <div style={{ fontWeight: '700', fontSize: '1rem' }}>{selectedDelivery.block} - Apto {selectedDelivery.unit_number}</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Morador: {selectedDelivery.resident_name || 'Qualquer morador da unidade'}</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', marginTop: '4px' }}>{selectedDelivery.courier} • {selectedDelivery.description}</div>
-                </div>
-
-                <div className="form-group">
-                  <label>Digite o PIN de Retirada (4 Dígitos do Morador) *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    required
-                    placeholder="Ex: 7492"
-                    maxLength={4}
-                    style={{ fontSize: '1.4rem', letterSpacing: '0.3em', textAlign: 'center', fontWeight: 'bold' }}
-                    value={pickupPinInput}
-                    onChange={(e) => setPickupPinInput(e.target.value)}
-                  />
-                  <small style={{ color: 'var(--text-dim)', display: 'block', marginTop: '6px' }}>
-                    O morador recebeu este código no aviso de entrega. PIN de teste: <strong>{selectedDelivery.pickup_code}</strong>
-                  </small>
-                </div>
-
-                <div className="form-group">
-                  <label>Nome de quem está retirando na portaria</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Ex: O próprio morador, filho, funcionário..."
-                    value={pickedUpByInput}
-                    onChange={(e) => setPickedUpByInput(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsPickupModalOpen(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-success">
-                  Confirmar Entrega
-                </button>
-              </div>
-            </form>
+              <button type="submit" className="btn btn-success">
+                Confirmar Entrega
+              </button>
+            </>
+          )}
+        >
+          <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '18px' }}>
+            <div style={{ fontWeight: '700', fontSize: '1rem' }}>{selectedDelivery.block} - Apto {selectedDelivery.unit_number}</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Morador: {selectedDelivery.resident_name || 'Qualquer morador da unidade'}</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--accent-primary)', marginTop: '4px' }}>{selectedDelivery.courier} • {selectedDelivery.description}</div>
           </div>
-        </div>
+
+          <div className="form-group">
+            <label>Digite o PIN de Retirada (4 Dígitos do Morador) *</label>
+            <input
+              type="text"
+              className="form-control"
+              required
+              placeholder="Ex: 7492"
+              maxLength={4}
+              style={{ fontSize: '1.4rem', letterSpacing: '0.3em', textAlign: 'center', fontWeight: 'bold' }}
+              value={pickupPinInput}
+              onChange={(e) => setPickupPinInput(e.target.value)}
+            />
+            <small style={{ color: 'var(--text-dim)', display: 'block', marginTop: '6px' }}>
+              O morador recebeu este código no aviso de entrega. PIN de teste: <strong>{selectedDelivery.pickup_code}</strong>
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label>Nome de quem está retirando na portaria</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Ex: O próprio morador, filho, funcionário..."
+              value={pickedUpByInput}
+              onChange={(e) => setPickedUpByInput(e.target.value)}
+            />
+          </div>
+        </CrudModal>
       )}
     </div>
   );

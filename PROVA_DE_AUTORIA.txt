@@ -32,6 +32,18 @@ SUMÁRIO GERAL
    - server/repositories/ResidentRepository.js
    - server/repositories/DeliveryRepository.js
    - server/repositories/FinancialRepository.js
+4.2 CAMADA DE DOMÍNIO: AS 10 ENTIDADES DE DOMÍNIO (DDD / POO)
+   - server/domain/BaseDomainEntity.js
+   - server/domain/entities/Condominium.js
+   - server/domain/entities/Block.js
+   - server/domain/entities/Unit.js
+   - server/domain/entities/Resident.js
+   - server/domain/entities/Vehicle.js
+   - server/domain/entities/Delivery.js
+   - server/domain/entities/AccessLog.js
+   - server/domain/entities/Reservation.js
+   - server/domain/entities/FinancialTransaction.js
+   - server/domain/entities/Announcement.js
 5. ARQUIVOS DE PERSISTÊNCIA E CRUDS (DAOS)
    - server/dao/CondominiumDAO.js (Condomínios, Blocos, Unidades, Módulos)
    - server/dao/ResidentDAO.js (Moradores, Veículos)
@@ -542,6 +554,61 @@ ARQUIVOS 11.3: server/repositories/ResidentRepository.js & DeliveryRepository.js
 - Herança: Estendem `BaseRepository`, ganhando gratuitamente métodos `create`,
   `findById`, `update`, `delete`, `count`, `exists`, e implementando apenas
   consultas complexas com JOINs relacionais de unidade e morador.
+- Hidratação de Domínio: Implementam o método `toDomain(row)`, permitindo converter
+  registros relacionais em instâncias vivas das entidades de domínio (`Resident`, `Delivery`).
+
+================================================================================
+4.2 CAMADA DE DOMÍNIO: AS 10 ENTIDADES DE DOMÍNIO PURO (server/domain/entities/*)
+================================================================================
+A arquitetura implementa 10 Entidades de Domínio com encapsulamento, atributos
+privados via convenção, validação rigorosa de invariantes (`validate()`) e
+comportamentos específicos de negócio:
+
+1. Condominium (server/domain/entities/Condominium.js)
+   - Responsabilidade: Tenant raiz do sistema.
+   - Métodos: `isActive()`, `activate()`, `deactivate()`, `validate()`.
+
+2. Block (server/domain/entities/Block.js)
+   - Responsabilidade: Bloco ou torre territorial dentro de um condomínio.
+   - Métodos: `isActive()`, `normalizeName()`, `validate()`.
+
+3. Unit (server/domain/entities/Unit.js)
+   - Responsabilidade: Unidade autônoma habitacional ou comercial.
+   - Métodos: `getFullIdentifier()`, `isPenthouse()`, `validate()`.
+
+4. Resident (server/domain/entities/Resident.js)
+   - Responsabilidade: Ocupante físico e morador da unidade.
+   - Métodos: `isOwner()`, `isTenant()`, `hasEmergencyContact()`, `validate()`.
+
+5. Vehicle (server/domain/entities/Vehicle.js)
+   - Responsabilidade: Veículo vinculado a moradores e vagas de garagem.
+   - Métodos: `normalizePlate()`, `isCar()`, `isMotorcycle()`, `validate()`.
+
+6. Delivery (server/domain/entities/Delivery.js)
+   - Responsabilidade: Encomenda recebida na portaria com custódia de PIN.
+   - Métodos: `isPending()`, `verifyPin(pin)`, `markAsDelivered(pin)`, `cancel(reason)`, `validate()`.
+
+7. AccessLog (server/domain/entities/AccessLog.js)
+   - Responsabilidade: Controle de acesso à portaria de visitantes e prestadores.
+   - Métodos: `isInProperty()`, `registerExit(time)`, `calculateStayDurationMinutes()`, `validate()`.
+
+8. Reservation (server/domain/entities/Reservation.js)
+   - Responsabilidade: Agendamento e uso de espaços comuns de lazer.
+   - Métodos: `isConfirmed()`, `isCancelled()`, `calculateDurationHours()`, `hasConflictWith(other)`, `validate()`.
+
+9. FinancialTransaction (server/domain/entities/FinancialTransaction.js)
+   - Responsabilidade: Movimentação financeira (receitas e despesas condominiais).
+   - Métodos: `isIncome()`, `isExpense()`, `isPaid()`, `markAsPaid(date)`, `validate()`.
+
+10. Announcement (server/domain/entities/Announcement.js)
+    - Responsabilidade: Comunicados e alertas informativos no mural.
+    - Métodos: `isPinned()`, `isHighPriority()`, `isExpired()`, `validate()`.
+
+- Classe Base Comum: `BaseDomainEntity` (server/domain/BaseDomainEntity.js)
+  Garante serialização compatível com JSON (`toJSON()`, `toDTO()`) e ciclo de vida.
+- Integração sem Acoplamento Quebrante:
+  As entidades validam as operações do GoF Template Method (`EntityOperationTemplate.js`)
+  e são hidratadas pelos Repositórios Especializados via `toDomain(row)`.
 
 ================================================================================
 5. ARQUIVOS DE PERSISTÊNCIA E CRUDS (DAOS)
@@ -772,4 +839,15 @@ R5: "Implementamos Row-Level Multi-Tenancy. O middleware do Express intercepta o
 condomínio ativo e injeta no `req.condominiumId`. As consultas dos DAOs usam os
 métodos de escopo de `AbstractTenantDAO`, garantindo que um condomínio nunca enxergue
 ou altere blocos, moradores, veículos ou finanças de outro."
+
+P6: "Temos classes de domínio no projeto? Quantas são e como funcionam?"
+R6: "Sim, temos exatamente 10 Entidades de Domínio localizadas em
+server/domain/entities/* (Condominium, Block, Unit, Resident, Vehicle, Delivery,
+AccessLog, Reservation, FinancialTransaction e Announcement), todas herdando de
+BaseDomainEntity. Elas encapsulam atributos de negócio, validações de invariantes
+(método `validate()`) e regras comportamentais específicas (ex: verificação de PIN
+em Delivery, detecção de colisão e cálculo de duração em Reservation, cálculo de tempo
+de permanência em AccessLog). Elas se integram de forma elegante ao GoF Template Method
+(EntityOperationTemplate) e aos repositórios especializados sem quebrar a
+compatibilidade com DAOs e controladores Express."
 ================================================================================

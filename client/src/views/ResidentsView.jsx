@@ -15,6 +15,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { api } from '../services/api';
+import CrudModal from '../components/CrudModal';
 
 const EMPTY_RESIDENT = {
   unit_id: '',
@@ -494,265 +495,223 @@ export default function ResidentsView({ showToast }) {
       )}
 
       {/* Modal: Criar / Editar Morador */}
-      {isResidentModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {editingResident
-                  ? <><Pencil size={20} color="var(--accent-primary)" /> Editar Morador</>
-                  : <><UserPlus size={20} color="var(--accent-primary)" /> Cadastrar Novo Morador</>
-                }
-              </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeResidentModal}>
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitResident}>
-              <div className="modal-body">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Unidade (Apartamento) *</label>
-                    <select
-                      className="form-control"
-                      required
-                      value={residentForm.unit_id}
-                      onChange={(e) => setResidentForm({ ...residentForm, unit_id: e.target.value })}
-                    >
-                      <option value="">Selecione a Unidade</option>
-                      {units.map((u) => (
-                        <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
-                      ))}
-                    </select>
-                  </div>
+      <CrudModal
+        isOpen={isResidentModalOpen}
+        onClose={closeResidentModal}
+        title={editingResident ? 'Editar Morador' : 'Cadastrar Novo Morador'}
+        icon={editingResident ? Pencil : UserPlus}
+        onSubmit={handleSubmitResident}
+        submitText={editingResident ? 'Salvar Alterações' : 'Salvar Morador'}
+      >
+        <div className="form-row">
+          <div className="form-group">
+            <label>Unidade (Apartamento) *</label>
+            <select
+              className="form-control"
+              required
+              value={residentForm.unit_id}
+              onChange={(e) => setResidentForm({ ...residentForm, unit_id: e.target.value })}
+            >
+              <option value="">Selecione a Unidade</option>
+              {units.map((u) => (
+                <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
+              ))}
+            </select>
+          </div>
 
-                  <div className="form-group">
-                    <label>Papel / Vínculo *</label>
-                    <select
-                      className="form-control"
-                      value={residentForm.role}
-                      onChange={(e) => setResidentForm({ ...residentForm, role: e.target.value })}
-                    >
-                      <option value="Proprietário">Proprietário</option>
-                      <option value="Inquilino">Inquilino</option>
-                      <option value="Familiar">Familiar / Dependente</option>
-                      <option value="Síndico">Síndico / Subsíndico</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Nome Completo *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    required
-                    placeholder="Ex: Carlos Eduardo Silva"
-                    value={residentForm.name}
-                    onChange={(e) => setResidentForm({ ...residentForm, name: e.target.value })}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Telefone / WhatsApp</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="(11) 98765-4321"
-                      value={residentForm.phone}
-                      onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>E-mail</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      placeholder="morador@email.com"
-                      value={residentForm.email}
-                      onChange={(e) => setResidentForm({ ...residentForm, email: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>CPF</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="123.456.789-00"
-                      value={residentForm.cpf}
-                      onChange={(e) => setResidentForm({ ...residentForm, cpf: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Contato de Emergência</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Ex: Maria (Esposa) (11) 99999-8888"
-                      value={residentForm.emergency_contact}
-                      onChange={(e) => setResidentForm({ ...residentForm, emergency_contact: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={closeResidentModal}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingResident ? 'Salvar Alterações' : 'Salvar Morador'}
-                </button>
-              </div>
-            </form>
+          <div className="form-group">
+            <label>Papel / Vínculo *</label>
+            <select
+              className="form-control"
+              value={residentForm.role}
+              onChange={(e) => setResidentForm({ ...residentForm, role: e.target.value })}
+            >
+              <option value="Proprietário">Proprietário</option>
+              <option value="Inquilino">Inquilino</option>
+              <option value="Familiar">Familiar / Dependente</option>
+              <option value="Síndico">Síndico / Subsíndico</option>
+            </select>
           </div>
         </div>
-      )}
 
-      {/* Modal: Novo Veículo */}
+        <div className="form-group">
+          <label>Nome Completo *</label>
+          <input
+            type="text"
+            className="form-control"
+            required
+            placeholder="Ex: Carlos Eduardo Silva"
+            value={residentForm.name}
+            onChange={(e) => setResidentForm({ ...residentForm, name: e.target.value })}
+          />
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Telefone / WhatsApp</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="(11) 98765-4321"
+              value={residentForm.phone}
+              onChange={(e) => setResidentForm({ ...residentForm, phone: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>E-mail</label>
+            <input
+              type="email"
+              className="form-control"
+              placeholder="morador@email.com"
+              value={residentForm.email}
+              onChange={(e) => setResidentForm({ ...residentForm, email: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>CPF</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="123.456.789-00"
+              value={residentForm.cpf}
+              onChange={(e) => setResidentForm({ ...residentForm, cpf: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Contato de Emergência</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Ex: Maria (Esposa) (11) 99999-8888"
+              value={residentForm.emergency_contact}
+              onChange={(e) => setResidentForm({ ...residentForm, emergency_contact: e.target.value })}
+            />
+          </div>
+        </div>
+      </CrudModal>
+
       {/* Modal: Cadastrar / Editar Veículo */}
-      {isVehicleModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {editingVehicle
-                  ? <><Pencil size={20} color="var(--accent-purple)" /> Editar Veículo</>
-                  : <><Car size={20} color="var(--accent-purple)" /> Cadastrar Veículo</>
-                }
-              </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeVehicleModal}>
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmitVehicle}>
-              <div className="modal-body">
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Unidade (Apartamento) *</label>
-                    <select
-                      className="form-control"
-                      required
-                      value={vehicleForm.unit_id}
-                      onChange={(e) => {
-                        const newUnitId = e.target.value;
-                        setVehicleForm({
-                          ...vehicleForm,
-                          unit_id: newUnitId,
-                          resident_id: '' // reseta morador ao trocar de unidade
-                        });
-                      }}
-                    >
-                      <option value="">Selecione a Unidade</option>
-                      {units.map((u) => (
-                        <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
-                      ))}
-                    </select>
-                  </div>
+      <CrudModal
+        isOpen={isVehicleModalOpen}
+        onClose={closeVehicleModal}
+        title={editingVehicle ? 'Editar Veículo' : 'Cadastrar Veículo'}
+        icon={editingVehicle ? Pencil : Car}
+        iconColor="var(--accent-purple)"
+        onSubmit={handleSubmitVehicle}
+        submitText={editingVehicle ? 'Salvar Alterações' : 'Cadastrar Veículo'}
+      >
+        <div className="form-row">
+          <div className="form-group">
+            <label>Unidade (Apartamento) *</label>
+            <select
+              className="form-control"
+              required
+              value={vehicleForm.unit_id}
+              onChange={(e) => {
+                const newUnitId = e.target.value;
+                setVehicleForm({
+                  ...vehicleForm,
+                  unit_id: newUnitId,
+                  resident_id: '' // reseta morador ao trocar de unidade
+                });
+              }}
+            >
+              <option value="">Selecione a Unidade</option>
+              {units.map((u) => (
+                <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
+              ))}
+            </select>
+          </div>
 
-                  <div className="form-group">
-                    <label>Pessoa Responsável (Morador)</label>
-                    <select
-                      className="form-control"
-                      value={vehicleForm.resident_id}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, resident_id: e.target.value })}
-                    >
-                      <option value="">Não associar a morador específico</option>
-                      {unitResidentsForVehicle.map((r) => (
-                        <option key={r.id} value={r.id}>{r.name} ({r.role})</option>
-                      ))}
-                    </select>
-                    {vehicleForm.unit_id && unitResidentsForVehicle.length === 0 && (
-                      <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                        Nenhum morador cadastrado nesta unidade.
-                      </small>
-                    )}
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Tipo de Veículo</label>
-                    <select
-                      className="form-control"
-                      value={vehicleForm.type}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, type: e.target.value })}
-                    >
-                      <option value="Carro">Carro</option>
-                      <option value="Moto">Moto</option>
-                      <option value="SUV / Caminhonete">SUV / Caminhonete</option>
-                      <option value="Outro">Outro</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Placa do Veículo *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      required
-                      placeholder="Ex: BRA2E19"
-                      value={vehicleForm.plate}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, plate: e.target.value.toUpperCase() })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Modelo / Marca *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      required
-                      placeholder="Ex: Toyota Corolla, Honda Civic..."
-                      value={vehicleForm.model}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Cor</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Ex: Prata, Preto, Branco"
-                      value={vehicleForm.color}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Vaga de Garagem</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Ex: Vaga G1-04"
-                    value={vehicleForm.parking_spot}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, parking_spot: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={closeVehicleModal}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingVehicle ? 'Salvar Alterações' : 'Cadastrar Veículo'}
-                </button>
-              </div>
-            </form>
+          <div className="form-group">
+            <label>Pessoa Responsável (Morador)</label>
+            <select
+              className="form-control"
+              value={vehicleForm.resident_id}
+              onChange={(e) => setVehicleForm({ ...vehicleForm, resident_id: e.target.value })}
+            >
+              <option value="">Não associar a morador específico</option>
+              {unitResidentsForVehicle.map((r) => (
+                <option key={r.id} value={r.id}>{r.name} ({r.role})</option>
+              ))}
+            </select>
+            {vehicleForm.unit_id && unitResidentsForVehicle.length === 0 && (
+              <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                Nenhum morador cadastrado nesta unidade.
+              </small>
+            )}
           </div>
         </div>
-      )}
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Tipo de Veículo</label>
+            <select
+              className="form-control"
+              value={vehicleForm.type}
+              onChange={(e) => setVehicleForm({ ...vehicleForm, type: e.target.value })}
+            >
+              <option value="Carro">Carro</option>
+              <option value="Moto">Moto</option>
+              <option value="SUV / Caminhonete">SUV / Caminhonete</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Placa do Veículo *</label>
+            <input
+              type="text"
+              className="form-control"
+              required
+              placeholder="Ex: BRA2E19"
+              value={vehicleForm.plate}
+              onChange={(e) => setVehicleForm({ ...vehicleForm, plate: e.target.value.toUpperCase() })}
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Modelo / Marca *</label>
+            <input
+              type="text"
+              className="form-control"
+              required
+              placeholder="Ex: Toyota Corolla, Honda Civic..."
+              value={vehicleForm.model}
+              onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Cor</label>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Ex: Prata, Preto, Branco"
+              value={vehicleForm.color}
+              onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Vaga de Garagem</label>
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Ex: Vaga G1-04"
+            value={vehicleForm.parking_spot}
+            onChange={(e) => setVehicleForm({ ...vehicleForm, parking_spot: e.target.value })}
+          />
+        </div>
+      </CrudModal>
     </div>
   );
 }

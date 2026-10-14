@@ -1,3 +1,5 @@
+import { Reservation } from '../../domain/index.js';
+
 /**
  * Padrão de Projeto: TEMPLATE METHOD (Validação e Integridade de Negócio)
  * AbstractBusinessValidator padroniza o algoritmo de validação em camadas.
@@ -44,6 +46,11 @@ export class ReservationConflictValidator extends AbstractBusinessValidator {
     if (!data.space_id) throw new Error('O espaço da reserva é obrigatório.');
     if (!data.reservation_date) throw new Error('A data da reserva é obrigatória.');
     if (!data.start_time || !data.end_time) throw new Error('Horários de início e fim são obrigatórios.');
+    // Integridade via entidade de domínio
+    const entity = new Reservation(data);
+    if (entity.startTime >= entity.endTime) {
+      throw new Error('O horário de início deve ser anterior ao horário de término.');
+    }
   }
 
   checkTemporalConstraints(data) {

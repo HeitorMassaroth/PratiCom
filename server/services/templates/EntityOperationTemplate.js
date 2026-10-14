@@ -1,6 +1,7 @@
 import DatabaseSingleton from '../../config/DatabaseSingleton.js';
 import { ReservationConflictValidator } from './BusinessValidatorTemplate.js';
 import { DeliveryNotificationDispatcher } from './NotificationTemplate.js';
+import { Resident, Reservation, Delivery } from '../../domain/index.js';
 
 /**
  * Padrão de Projeto: TEMPLATE METHOD (Ciclo de Execução de Operações de Domínio)
@@ -43,10 +44,10 @@ export class AbstractEntityOperation {
  * Subclasse concreta: Operação de Criação de Morador
  */
 export class CreateResidentOperation extends AbstractEntityOperation {
-  validate(input) {
-    super.validate(input);
-    if (!input.unit_id) throw new Error('Unidade é obrigatória.');
-    if (!input.name?.trim()) throw new Error('Nome é obrigatório.');
+  validate(input, context) {
+    super.validate(input, context);
+    const resident = new Resident(input);
+    resident.validate();
   }
 
   executePersist(input) {
@@ -81,7 +82,16 @@ export class CreateReservationOperation extends AbstractEntityOperation {
 
   validate(input, context) {
     super.validate(input, context);
+    const reservation = new Reservation(input);
+    reservation.validate();
     this.validator.validate(input, context);
+
+    if (input.resident_id && input.unit_id) {
+      const resident = this.db.prepare('SELECT id, unit_id FROM residents WHERE id = ?').get(parseInt(input.resident_id, 10));
+      if (!resident || resident.unit_id !== parseInt(input.unit_id, 10)) {
+        throw new Error('O morador informado não pertence à unidade selecionada.');
+      }
+    }
   }
 
   executePersist(input) {
@@ -132,8 +142,9 @@ export class CreateDeliveryOperation extends AbstractEntityOperation {
 
   validate(input, context = {}) {
     super.validate(input, context);
+    const delivery = new Delivery(input);
+    delivery.validate();
     const unitId = parseInt(input.unit_id, 10);
-    if (!unitId) throw new Error('Unidade é obrigatória.');
     if (!input.courier?.trim()) throw new Error('Transportadora/Entregador é obrigatório.');
 
     const residentId = input.resident_id ? parseInt(input.resident_id, 10) : null;

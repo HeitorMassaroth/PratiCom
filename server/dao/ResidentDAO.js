@@ -351,6 +351,14 @@ export class ResidentDAO extends AbstractTenantDAO {
       }
     }
 
+    if (data.resident_id) {
+      const resId = parseInt(data.resident_id, 10);
+      const resCheck = this.db.prepare('SELECT id, unit_id FROM residents WHERE id = ?').get(resId);
+      if (!resCheck || resCheck.unit_id !== unitId) {
+        throw new Error('O morador informado não pertence à unidade selecionada.');
+      }
+    }
+
     const stmt = this.db.prepare(`
       INSERT INTO vehicles (unit_id, resident_id, plate, model, color, type, parking_spot)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -384,6 +392,14 @@ export class ResidentDAO extends AbstractTenantDAO {
       `).get(...(cId === 1 ? [unitId] : [unitId, cId]));
       if (!unitCheck) {
         throw new Error('A nova unidade informada não pertence a este condomínio.');
+      }
+    }
+
+    const targetResident = data.resident_id !== undefined ? (data.resident_id ? parseInt(data.resident_id, 10) : null) : existing.resident_id;
+    if (targetResident) {
+      const resCheck = this.db.prepare('SELECT id, unit_id FROM residents WHERE id = ?').get(targetResident);
+      if (!resCheck || resCheck.unit_id !== unitId) {
+        throw new Error('O morador informado não pertence à unidade selecionada.');
       }
     }
 

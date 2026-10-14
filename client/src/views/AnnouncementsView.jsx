@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Megaphone,
   Plus,
@@ -8,12 +8,13 @@ import {
   AlertTriangle,
   Calendar,
   User,
-  X,
   Tag,
   CheckCircle,
   Bell
 } from 'lucide-react';
 import { api } from '../services/api';
+import CrudModal from '../components/CrudModal';
+import { useCrud } from '../hooks/useCrud';
 
 const EMPTY_ANNOUNCEMENT = {
   title: '',
@@ -27,8 +28,6 @@ const EMPTY_ANNOUNCEMENT = {
 };
 
 export default function AnnouncementsView({ showToast }) {
-  const [announcements, setAnnouncements] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
 
@@ -37,24 +36,20 @@ export default function AnnouncementsView({ showToast }) {
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [formData, setFormData] = useState(EMPTY_ANNOUNCEMENT);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const res = await api.getAnnouncements({
-        category: categoryFilter,
-        priority: priorityFilter
-      });
-      setAnnouncements(res);
-    } catch (err) {
-      showToast('Erro ao carregar comunicados.', 'danger');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchAnnouncements = useCallback(() => api.getAnnouncements({
+    category: categoryFilter,
+    priority: priorityFilter
+  }), [categoryFilter, priorityFilter]);
 
-  useEffect(() => {
-    loadData();
-  }, [categoryFilter, priorityFilter]);
+  const {
+    items: announcements,
+    loading,
+    refresh: loadData
+  } = useCrud({
+    fetchFn: fetchAnnouncements,
+    deps: [categoryFilter, priorityFilter],
+    onError: () => showToast('Erro ao carregar comunicados.', 'danger')
+  });
 
   const openCreateModal = () => {
     setEditingAnnouncement(null);
@@ -250,125 +245,107 @@ export default function AnnouncementsView({ showToast }) {
       </div>
 
       {/* Modal: Novo Comunicado */}
-      {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Megaphone size={20} color="var(--accent-primary)" /> {editingAnnouncement ? 'Editar Comunicado' : 'Publicar Comunicado Oficial'}
-              </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={closeModal}>
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleCreate}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Título do Comunicado *</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    required
-                    placeholder="Ex: Interrupção Temporária de Água para Manutenção"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  />
-                </div>
+      <CrudModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        title={editingAnnouncement ? 'Editar Comunicado' : 'Publicar Comunicado Oficial'}
+        icon={Megaphone}
+        onSubmit={handleCreate}
+        submitText={editingAnnouncement ? 'Salvar Alterações' : 'Publicar Aviso'}
+      >
+        <div className="form-group">
+          <label>Título do Comunicado *</label>
+          <input
+            type="text"
+            className="form-control"
+            required
+            placeholder="Ex: Interrupção Temporária de Água para Manutenção"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          />
+        </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Categoria *</label>
-                    <select
-                      className="form-control"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    >
-                      <option value="Geral">Geral</option>
-                      <option value="Manutenção">Manutenção</option>
-                      <option value="Assembleia">Assembleia</option>
-                      <option value="Segurança">Segurança</option>
-                      <option value="Lazer">Lazer</option>
-                    </select>
-                  </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Categoria *</label>
+            <select
+              className="form-control"
+              value={formData.category}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            >
+              <option value="Geral">Geral</option>
+              <option value="Manutenção">Manutenção</option>
+              <option value="Assembleia">Assembleia</option>
+              <option value="Segurança">Segurança</option>
+              <option value="Lazer">Lazer</option>
+            </select>
+          </div>
 
-                  <div className="form-group">
-                    <label>Nível de Prioridade *</label>
-                    <select
-                      className="form-control"
-                      value={formData.priority}
-                      onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="high">Alta</option>
-                      <option value="urgent">Urgente (Destaque Vermelho)</option>
-                      <option value="low">Baixa</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Mensagem / Conteúdo Completo *</label>
-                  <textarea
-                    className="form-control"
-                    rows="4"
-                    required
-                    placeholder="Escreva a mensagem clara com datas, horários e orientações aos condôminos..."
-                    value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                  ></textarea>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Destinatários</label>
-                    <select
-                      className="form-control"
-                      value={formData.target_block}
-                      onChange={(e) => setFormData({ ...formData, target_block: e.target.value })}
-                    >
-                      <option value="Todos">Todo o Condomínio (Todas as Torres)</option>
-                      <option value="Torre A">Apenas Torre A</option>
-                      <option value="Torre B">Apenas Torre B</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Válido Até (Opcional)</label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={formData.expires_at}
-                      onChange={(e) => setFormData({ ...formData, expires_at: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
-                  <input
-                    type="checkbox"
-                    id="is_pinned"
-                    checked={formData.is_pinned}
-                    onChange={(e) => setFormData({ ...formData, is_pinned: e.target.checked })}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="is_pinned" style={{ margin: 0, cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-main)' }}>
-                    Fixar este aviso no topo do mural dos moradores
-                  </label>
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingAnnouncement ? 'Salvar Alterações' : 'Publicar Aviso'}
-                </button>
-              </div>
-            </form>
+          <div className="form-group">
+            <label>Nível de Prioridade *</label>
+            <select
+              className="form-control"
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+            >
+              <option value="normal">Normal</option>
+              <option value="high">Alta</option>
+              <option value="urgent">Urgente (Destaque Vermelho)</option>
+              <option value="low">Baixa</option>
+            </select>
           </div>
         </div>
-      )}
+
+        <div className="form-group">
+          <label>Mensagem / Conteúdo Completo *</label>
+          <textarea
+            className="form-control"
+            rows="4"
+            required
+            placeholder="Escreva a mensagem clara com datas, horários e orientações aos condôminos..."
+            value={formData.content}
+            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+          ></textarea>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>Destinatários</label>
+            <select
+              className="form-control"
+              value={formData.target_block}
+              onChange={(e) => setFormData({ ...formData, target_block: e.target.value })}
+            >
+              <option value="Todos">Todo o Condomínio (Todas as Torres)</option>
+              <option value="Torre A">Apenas Torre A</option>
+              <option value="Torre B">Apenas Torre B</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Válido Até (Opcional)</label>
+            <input
+              type="date"
+              className="form-control"
+              value={formData.expires_at}
+              onChange={(e) => setFormData({ ...formData, expires_at: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+          <input
+            type="checkbox"
+            id="is_pinned"
+            checked={formData.is_pinned}
+            onChange={(e) => setFormData({ ...formData, is_pinned: e.target.checked })}
+            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+          />
+          <label htmlFor="is_pinned" style={{ margin: 0, cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-main)' }}>
+            Fixar este aviso no topo do mural dos moradores
+          </label>
+        </div>
+      </CrudModal>
     </div>
   );
 }
