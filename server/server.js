@@ -104,7 +104,20 @@ app.get('/api/dashboard', checkModuleAvailability('dashboard'), async (req, res)
     const summary = hasFinancial ? financialDAO.getSummary({ condominiumId }) : null;
 
     const announcements = announcementDAO.getAnnouncements({ condominiumId });
-    const urgentAnnouncements = announcements.filter(a => a.priority === 'URGENTE' || a.priority === 'high');
+    const isUrgentOrPinned = (a) => {
+      const p = String(a.priority || '').toLowerCase();
+      const isUrgent = p === 'urgente' || p === 'urgent' || p === 'high' || p === 'alta';
+      const isPinned = a.is_pinned === 1 || a.is_pinned === true;
+      return isUrgent || isPinned;
+    };
+    const urgentAnnouncements = announcements
+      .filter(isUrgentOrPinned)
+      .sort((a, b) => {
+        const aPinned = (a.is_pinned === 1 || a.is_pinned === true) ? 1 : 0;
+        const bPinned = (b.is_pinned === 1 || b.is_pinned === true) ? 1 : 0;
+        if (bPinned !== aPinned) return bPinned - aPinned;
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
 
     const today = new Date().toLocaleDateString('en-CA');
     const reservations = hasReservations ? spaceDAO.getReservations({ condominiumId }) : [];

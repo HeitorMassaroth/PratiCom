@@ -12,7 +12,8 @@ import {
   Clock,
   Sparkles,
   ChevronRight,
-  ShoppingCart
+  ShoppingCart,
+  Pin
 } from 'lucide-react';
 
 export default function DashboardView({ data, setCurrentView, onRefresh }) {
@@ -258,30 +259,51 @@ export default function DashboardView({ data, setCurrentView, onRefresh }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {urgentAnnouncements.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '16px' }}>
-                  Nenhum aviso urgente no momento.
+                  Nenhum aviso em destaque no momento.
                 </div>
               ) : (
-                urgentAnnouncements.map((ann) => (
-                  <div key={ann.id} style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid var(--border-color)',
-                    borderLeft: '4px solid var(--accent-danger)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '14px',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                      <span style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)' }}>
-                        {ann.title}
-                      </span>
-                      <span className="badge badge-danger" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
-                        {ann.priority}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                      {ann.content ? (ann.content.length > 120 ? `${ann.content.slice(0, 120)}...` : ann.content) : ''}
-                    </p>
-                  </div>
-                ))
+                [...urgentAnnouncements]
+                  .sort((a, b) => {
+                    const aPinned = (a.is_pinned === 1 || a.is_pinned === true) ? 1 : 0;
+                    const bPinned = (b.is_pinned === 1 || b.is_pinned === true) ? 1 : 0;
+                    if (bPinned !== aPinned) return bPinned - aPinned;
+                    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                  })
+                  .map((ann) => {
+                    const isPinned = ann.is_pinned === 1 || ann.is_pinned === true;
+                    const p = String(ann.priority || '').toLowerCase();
+                    const isUrgent = p === 'urgent' || p === 'urgente' || p === 'high' || p === 'alta';
+
+                    return (
+                      <div key={ann.id} style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid var(--border-color)',
+                        borderLeft: isPinned ? '4px solid var(--accent-purple)' : '4px solid var(--accent-danger)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '14px',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px', gap: '8px' }}>
+                          <span style={{ fontWeight: '700', fontSize: '0.9rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {isPinned && <Pin size={13} color="var(--accent-purple)" style={{ flexShrink: 0 }} />}
+                            {ann.title}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            {isPinned && (
+                              <span className="badge badge-purple" style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                                Fixado
+                              </span>
+                            )}
+                            <span className={`badge ${isUrgent ? 'badge-danger' : 'badge-warning'}`} style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>
+                              {ann.priority}
+                            </span>
+                          </div>
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                          {ann.content ? (ann.content.length > 120 ? `${ann.content.slice(0, 120)}...` : ann.content) : ''}
+                        </p>
+                      </div>
+                    );
+                  })
               )}
             </div>
           </div>
