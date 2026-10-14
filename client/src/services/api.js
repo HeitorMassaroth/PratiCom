@@ -103,12 +103,17 @@ export const api = {
 
   // Reservas
   getSpaces: () => request('/spaces'),
+  createSpace: (data) => request('/spaces', { method: 'POST', body: JSON.stringify(data) }),
+  updateSpace: (id, data) => request(`/spaces/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteSpace: (id) => request(`/spaces/${id}`, { method: 'DELETE' }),
   getReservations: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/reservations${qs ? '?' + qs : ''}`);
   },
   createReservation: (data) => request('/reservations', { method: 'POST', body: JSON.stringify(data) }),
+  updateReservation: (id, data) => request(`/reservations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   cancelReservation: (id) => request(`/reservations/${id}/cancel`, { method: 'PATCH' }),
+  deleteReservation: (id) => request(`/reservations/${id}`, { method: 'DELETE' }),
 
   // Financeiro
   getFinancialSummary: () => request('/financial/summary'),

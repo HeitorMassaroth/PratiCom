@@ -13,9 +13,52 @@ import {
   Flame,
   Plus,
   Ban,
-  Building
+  Building,
+  Edit3,
+  Trash2,
+  Save
 } from 'lucide-react';
 import { api } from '../services/api';
+
+const initialSpaceForm = {
+  name: '',
+  description: '',
+  capacity: '',
+  price_per_hour: '',
+  rules: ''
+};
+
+const formatLocalDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const addHoursToTime = (time, hoursToAdd) => {
+  if (!time) return time;
+  const [hours, minutes] = time.split(':').map(Number);
+  const baseDate = new Date(2000, 0, 1, hours, minutes || 0, 0, 0);
+  baseDate.setHours(baseDate.getHours() + hoursToAdd);
+  const nextHours = String(baseDate.getHours()).padStart(2, '0');
+  const nextMinutes = String(baseDate.getMinutes()).padStart(2, '0');
+  return `${nextHours}:${nextMinutes}`;
+};
+
+const initialReservationForm = {
+  space_id: '',
+  unit_id: '',
+  resident_id: '',
+  reservation_date: formatLocalDate(new Date()),
+  start_time: '08:00',
+  end_time: '09:00',
+  guests_count: 0,
+  notes: ''
+};
+
+const todayLocal = new Date();
+todayLocal.setHours(0, 0, 0, 0);
+const minReservationDate = formatLocalDate(todayLocal);
 
 export default function ReservationsView({ showToast }) {
   const [spaces, setSpaces] = useState([]);
@@ -25,16 +68,33 @@ export default function ReservationsView({ showToast }) {
   const [loading, setLoading] = useState(true);
 
   // Filtros / Seleção
-  const [selectedSpaceId, setSelectedSpaceId] = useState(1);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedSpaceId, setSelectedSpaceId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(minReservationDate);
 
-  // Modal de Nova Reserva
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState(null);
-  const [residentIdInput, setResidentIdInput] = useState('');
-  const [unitIdInput, setUnitIdInput] = useState('');
-  const [guestsCount, setGuestsCount] = useState(0);
-  const [notesInput, setNotesInput] = useState('');
+  // CRUD de Áreas
+  const [spaceForm, setSpaceForm] = useState(initialSpaceForm);
+  const [editingSpaceId, setEditingSpaceId] = useState(null);
+
+  // CRUD de Reservas
+  const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
+  const [reservationMode, setReservationMode] = useState('create');
+  const [editingReservationId, setEditingReservationId] = useState(null);
+  const [reservationForm, setReservationForm] = useState(initialReservationForm);
+
+  const resetSpaceForm = () => {
+    setSpaceForm(initialSpaceForm);
+    setEditingSpaceId(null);
+  };
+
+  const resetReservationForm = () => {
+    setReservationForm({
+      ...initialReservationForm,
+      reservation_date: selectedDate,
+      space_id: activeSpace?.id ? String(activeSpace.id) : ''
+    });
+    setReservationMode('create');
+    setEditingReservationId(null);
+  };
 
   // Ícones dinâmicos
   const iconMap = {
@@ -78,8 +138,11 @@ export default function ReservationsView({ showToast }) {
       setUnits(unitsRes);
       setResidents(residentsRes);
 
-      if (spacesRes.length > 0 && !selectedSpaceId) {
-        setSelectedSpaceId(spacesRes[0].id);
+      if (spacesRes.length > 0) {
+        const hasSelectedSpace = spacesRes.some(space => space.id === parseInt(selectedSpaceId, 10));
+        if (!selectedSpaceId || !hasSelectedSpace) {
+          setSelectedSpaceId(String(spacesRes[0].id));
+        }
       }
     } catch (err) {
       showToast('Erro ao carregar reservas e espaços.', 'danger');
@@ -95,55 +158,198 @@ export default function ReservationsView({ showToast }) {
   const activeSpace = spaces.find(s => s.id === parseInt(selectedSpaceId, 10)) || spaces[0];
 
   // Identificar quais horários já estão ocupados neste espaço e data
-  const occupiedSlots = reservations.filter(r => r.space_id === activeSpace?.id && r.status === 'Confirmada');
+  const occupiedSlots = reservations.filter(r => r.space_id === activeSpace?.id && r.status === 'CONFIRMED');
+
+  const filteredReservations = reservations.filter(reservation => reservation.reservation_date === selectedDate);
+
+  const syncReservationResident = (unitId, currentResidentId = '') => {
+    const availableResidents = residents.filter(resident => resident.unit_id === parseInt(unitId, 10));
+    if (currentResidentId && availableResidents.some(resident => resident.id === parseInt(currentResidentId, 10))) {
+      return currentResidentId;
+    }
+    return availableResidents[0]?.id ? String(availableResidents[0].id) : '';
+  };
+
+  const openReservationModal = ({ mode = 'create', reservation = null, slot = null } = {}) => {
+    const targetSpaceId = reservation?.space_id || activeSpace?.id || '';
+    const targetUnitId = reservation?.unit_id || '';
+    const targetResidentId = reservation?.resident_id || '';
+
+    const startTime = reservation?.start_time || slot?.start || '08:00';
+    const endTime = reservation?.end_time || slot?.end || '09:00';
+
+    setReservationMode(mode);
+    setEditingReservationId(reservation?.id || null);
+    setReservationForm({
+      space_id: targetSpaceId ? String(targetSpaceId) : '',
+      unit_id: targetUnitId ? String(targetUnitId) : '',
+      resident_id: targetResidentId ? String(targetResidentId) : '',
+      reservation_date: reservation?.reservation_date || selectedDate,
+      start_time: startTime,
+      end_time: endTime,
+      guests_count: reservation?.guests_count ?? 0,
+      notes: reservation?.notes || ''
+    });
+
+    if (targetUnitId && !targetResidentId) {
+      setReservationForm(current => ({
+        ...current,
+        resident_id: syncReservationResident(targetUnitId)
+      }));
+    }
+
+    setIsReservationModalOpen(true);
+  };
 
   const handleOpenBooking = (slot) => {
+    if (!activeSpace) {
+      showToast('Cadastre uma área comum antes de criar reservas.', 'warning');
+      return;
+    }
+
     // Verificar se o slot já está ocupado
     const isOccupied = occupiedSlots.some(r => r.start_time === slot.start);
     if (isOccupied) return;
 
-    setSelectedSlot(slot);
-    setIsModalOpen(true);
+    openReservationModal({ mode: 'create', slot });
   };
 
-  const handleUnitChange = (unitId) => {
-    setUnitIdInput(unitId);
-    // Pegar o primeiro morador desta unidade
-    const firstResident = residents.find(r => r.unit_id === parseInt(unitId, 10));
-    if (firstResident) {
-      setResidentIdInput(firstResident.id.toString());
-    } else {
-      setResidentIdInput('');
-    }
+  const handleSpaceFormChange = (field, value) => {
+    setSpaceForm(current => ({ ...current, [field]: value }));
   };
 
-  const handleCreateReservation = async (e) => {
+  const handleEditSpace = (space) => {
+    setEditingSpaceId(space.id);
+    setSpaceForm({
+      name: space.name || '',
+      description: space.description || '',
+      capacity: space.capacity ?? '',
+      price_per_hour: space.price_per_hour ?? '',
+      rules: space.rules || ''
+    });
+  };
+
+  const handleSaveSpace = async (e) => {
     e.preventDefault();
-    if (!residentIdInput || !unitIdInput || !selectedSlot) {
-      showToast('Selecione o morador e o horário.', 'warning');
+
+    if (!spaceForm.name.trim()) {
+      showToast('Informe o nome da área.', 'warning');
+      return;
+    }
+
+    if (!spaceForm.capacity || parseInt(spaceForm.capacity, 10) <= 0) {
+      showToast('Informe uma capacidade válida.', 'warning');
       return;
     }
 
     try {
-      await api.createReservation({
-        space_id: activeSpace.id,
-        resident_id: parseInt(residentIdInput, 10),
-        unit_id: parseInt(unitIdInput, 10),
-        reservation_date: selectedDate,
-        start_time: selectedSlot.start,
-        end_time: selectedSlot.end,
-        guests_count: guestsCount,
-        notes: notesInput
-      });
+      const payload = {
+        ...spaceForm,
+        capacity: parseInt(spaceForm.capacity, 10),
+        price_per_hour: spaceForm.price_per_hour === '' ? 0 : parseFloat(spaceForm.price_per_hour || '0')
+      };
 
-      showToast(`Reserva confirmada com sucesso para ${selectedSlot.start} às ${selectedSlot.end}!`, 'success');
-      setIsModalOpen(false);
-      setSelectedSlot(null);
-      setNotesInput('');
-      setGuestsCount(0);
+      if (editingSpaceId) {
+        await api.updateSpace(editingSpaceId, payload);
+        showToast('Área atualizada com sucesso.', 'success');
+      } else {
+        await api.createSpace(payload);
+        showToast('Área criada com sucesso.', 'success');
+      }
+
+      resetSpaceForm();
       loadData();
     } catch (err) {
-      showToast(err.message || 'Erro ao criar reserva.', 'danger');
+      showToast(err.message || 'Erro ao salvar área.', 'danger');
+    }
+  };
+
+  const handleDeleteSpace = async (space) => {
+    if (!window.confirm(`Excluir a área "${space.name}"?`)) return;
+
+    try {
+      await api.deleteSpace(space.id);
+      if (editingSpaceId === space.id) {
+        resetSpaceForm();
+      }
+      showToast('Área removida com sucesso.', 'info');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao excluir área.', 'danger');
+    }
+  };
+
+  const handleReservationFieldChange = (field, value) => {
+    if (field === 'unit_id') {
+      setReservationForm(current => ({
+        ...current,
+        unit_id: value,
+        resident_id: syncReservationResident(value)
+      }));
+      return;
+    }
+
+    if (field === 'start_time') {
+      setReservationForm(current => ({
+        ...current,
+        start_time: value,
+        end_time: addHoursToTime(value, 1)
+      }));
+      return;
+    }
+
+    if (field === 'end_time') {
+      setReservationForm(current => ({
+        ...current,
+        end_time: value,
+        start_time: addHoursToTime(value, -1)
+      }));
+      return;
+    }
+
+    setReservationForm(current => ({ ...current, [field]: value }));
+  };
+
+  const handleSaveReservation = async (e) => {
+    e.preventDefault();
+
+    if (!reservationForm.space_id || !reservationForm.unit_id || !reservationForm.resident_id) {
+      showToast('Selecione a área, a unidade e o morador.', 'warning');
+      return;
+    }
+
+    if (!reservationForm.start_time || !reservationForm.end_time) {
+      showToast('Selecione o período da reserva.', 'warning');
+      return;
+    }
+
+    const payload = {
+      space_id: parseInt(reservationForm.space_id, 10),
+      resident_id: parseInt(reservationForm.resident_id, 10),
+      unit_id: parseInt(reservationForm.unit_id, 10),
+      reservation_date: reservationForm.reservation_date,
+      start_time: reservationForm.start_time,
+      end_time: reservationForm.end_time,
+      guests_count: parseInt(reservationForm.guests_count, 10) || 0,
+      notes: reservationForm.notes
+    };
+
+    try {
+      if (reservationMode === 'edit' && editingReservationId) {
+        await api.updateReservation(editingReservationId, payload);
+        showToast('Reserva atualizada com sucesso.', 'success');
+      } else {
+        await api.createReservation(payload);
+        showToast('Reserva confirmada com sucesso.', 'success');
+      }
+
+      setIsReservationModalOpen(false);
+      setEditingReservationId(null);
+      setReservationMode('create');
+      setReservationForm(initialReservationForm);
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao salvar reserva.', 'danger');
     }
   };
 
@@ -158,9 +364,20 @@ export default function ReservationsView({ showToast }) {
     }
   };
 
+  const handleDeleteReservation = async (reservation) => {
+    if (!window.confirm(`Excluir permanentemente a reserva de ${reservation.space_name} às ${reservation.start_time}?`)) return;
+
+    try {
+      await api.deleteReservation(reservation.id);
+      showToast('Reserva excluída com sucesso.', 'info');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Erro ao excluir reserva.', 'danger');
+    }
+  };
+
   return (
     <div>
-      {/* Alerta de Regra de Negócio: 1 hora por morador por dia */}
       <div style={{
         background: 'rgba(59, 130, 246, 0.08)',
         border: '1px solid rgba(59, 130, 246, 0.25)',
@@ -193,13 +410,132 @@ export default function ReservationsView({ showToast }) {
             type="date"
             className="form-control"
             style={{ width: '170px' }}
+            min={minReservationDate}
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
           />
         </div>
       </div>
 
-      {/* Seletor de Espaços Comuns (Cards) */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <div className="card-header">
+          <div className="card-title">
+            <Building size={20} color="var(--accent-primary)" />
+            <span>Cadastro de Áreas Comuns</span>
+          </div>
+          {editingSpaceId && <span className="badge badge-warning">Editando área</span>}
+        </div>
+
+        <form onSubmit={handleSaveSpace} style={{ display: 'grid', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Nome da Área *</label>
+              <input
+                className="form-control"
+                value={spaceForm.name}
+                onChange={(e) => handleSpaceFormChange('name', e.target.value)}
+                placeholder="Ex.: Salão de festas"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Capacidade *</label>
+              <input
+                type="number"
+                className="form-control"
+                min="1"
+                value={spaceForm.capacity}
+                onChange={(e) => handleSpaceFormChange('capacity', e.target.value)}
+                placeholder="Ex.: 40"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Taxa por Hora (R$)</label>
+              <input
+                type="number"
+                className="form-control"
+                min="0"
+                step="0.01"
+                value={spaceForm.price_per_hour}
+                onChange={(e) => handleSpaceFormChange('price_per_hour', e.target.value)}
+                placeholder="0,00"
+              />
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Descrição</label>
+            <input
+              className="form-control"
+              value={spaceForm.description}
+              onChange={(e) => handleSpaceFormChange('description', e.target.value)}
+              placeholder="Ex.: Espaço climatizado para eventos"
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Regras de Uso</label>
+            <textarea
+              className="form-control"
+              rows="2"
+              value={spaceForm.rules}
+              onChange={(e) => handleSpaceFormChange('rules', e.target.value)}
+              placeholder="Ex.: Limpeza obrigatória ao final do uso"
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button type="submit" className="btn btn-primary">
+              <Save size={16} /> {editingSpaceId ? 'Salvar Alterações' : 'Criar Área'}
+            </button>
+            {editingSpaceId && (
+              <button type="button" className="btn btn-secondary" onClick={resetSpaceForm}>
+                Cancelar Edição
+              </button>
+            )}
+          </div>
+        </form>
+
+        <div className="table-container" style={{ marginTop: '18px' }}>
+          <table className="custom-table">
+            <thead>
+              <tr>
+                <th>Área</th>
+                <th>Capacidade</th>
+                <th>Taxa/Hora</th>
+                <th>Regras</th>
+                <th style={{ textAlign: 'right' }}>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {spaces.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    Nenhuma área cadastrada ainda.
+                  </td>
+                </tr>
+              ) : spaces.map((space) => (
+                <tr key={space.id}>
+                  <td style={{ fontWeight: '700' }}>{space.name}</td>
+                  <td>{space.capacity} pessoas</td>
+                  <td>{space.price_per_hour ? `R$ ${Number(space.price_per_hour).toFixed(2)}` : 'Gratuita'}</td>
+                  <td style={{ maxWidth: 320 }}>{space.rules || space.description || '-'}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                      <button className="btn btn-secondary btn-sm" type="button" onClick={() => handleEditSpace(space)}>
+                        <Edit3 size={14} /> Editar
+                      </button>
+                      <button className="btn btn-secondary btn-sm" type="button" style={{ color: '#ef4444' }} onClick={() => handleDeleteSpace(space)}>
+                        <Trash2 size={14} /> Excluir
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -213,7 +549,7 @@ export default function ReservationsView({ showToast }) {
           return (
             <div
               key={space.id}
-              onClick={() => setSelectedSpaceId(space.id)}
+              onClick={() => setSelectedSpaceId(String(space.id))}
               style={{
                 background: isSelected ? 'var(--accent-primary-gradient)' : 'var(--bg-card)',
                 border: isSelected ? '1px solid transparent' : '1px solid var(--border-color)',
@@ -238,9 +574,9 @@ export default function ReservationsView({ showToast }) {
                 }}>
                   <IconComp size={22} />
                 </div>
-                {space.fee > 0 ? (
+                {space.price_per_hour > 0 ? (
                   <span style={{ fontSize: '0.75rem', fontWeight: '700', background: isSelected ? 'rgba(0,0,0,0.2)' : 'rgba(16, 185, 129, 0.15)', color: isSelected ? '#fff' : '#10b981', padding: '2px 8px', borderRadius: '12px' }}>
-                    Taxa: R$ {space.fee.toFixed(2)}
+                    Taxa: R$ {Number(space.price_per_hour).toFixed(2)}
                   </span>
                 ) : (
                   <span style={{ fontSize: '0.75rem', fontWeight: '700', background: isSelected ? 'rgba(0,0,0,0.2)' : 'rgba(59, 130, 246, 0.15)', color: isSelected ? '#fff' : '#60a5fa', padding: '2px 8px', borderRadius: '12px' }}>
@@ -258,12 +594,11 @@ export default function ReservationsView({ showToast }) {
         })}
       </div>
 
-      {/* Grade de Horários (Slots de 1 Hora) */}
       <div className="card">
         <div className="card-header">
           <div>
             <div className="card-title" style={{ fontSize: '1.25rem' }}>
-              Grade de Horários - {activeSpace?.name}
+              Grade de Horários - {activeSpace?.name || 'Selecione uma área'}
             </div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
               Data selecionada: <strong>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>
@@ -314,13 +649,15 @@ export default function ReservationsView({ showToast }) {
         </div>
       </div>
 
-      {/* Lista de Reservas Confirmadas do Dia */}
       <div className="card" style={{ marginTop: '24px' }}>
         <div className="card-header">
           <div className="card-title">
             <CheckCircle2 size={20} color="var(--accent-success)" />
             <span>Reservas Agendadas para {selectedDate}</span>
           </div>
+          <button className="btn btn-primary btn-sm" type="button" onClick={() => openReservationModal({ mode: 'create' })}>
+            <Plus size={14} /> Nova Reserva
+          </button>
         </div>
 
         <div className="table-container">
@@ -328,22 +665,23 @@ export default function ReservationsView({ showToast }) {
             <thead>
               <tr>
                 <th>Espaço Comum</th>
-                <th>Horário (Exatamente 1h)</th>
+                <th>Horário</th>
                 <th>Morador / Unidade</th>
                 <th>Convidados</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Ação</th>
+                <th>Observações</th>
+                <th style={{ textAlign: 'right' }}>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {reservations.length === 0 ? (
+              {filteredReservations.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     Nenhuma reserva realizada para esta data.
                   </td>
                 </tr>
               ) : (
-                reservations.map((res) => (
+                filteredReservations.map((res) => (
                   <tr key={res.id}>
                     <td style={{ fontWeight: '700' }}>{res.space_name}</td>
                     <td>
@@ -354,27 +692,46 @@ export default function ReservationsView({ showToast }) {
                     <td>
                       <div style={{ fontWeight: '600' }}>{res.resident_name}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {res.block} - Apto {res.unit_number} {res.resident_phone && `• ${res.resident_phone}`}
+                        {res.block} - Apto {res.unit_number}
                       </div>
                     </td>
                     <td>{res.guests_count || 0} pessoas</td>
                     <td>
-                      {res.status === 'Confirmada' ? (
+                      {res.status === 'CONFIRMED' ? (
                         <span className="badge badge-success">Confirmada</span>
                       ) : (
                         <span className="badge badge-danger">{res.status}</span>
                       )}
                     </td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{res.notes || '-'}</td>
                     <td style={{ textAlign: 'right' }}>
-                      {res.status === 'Confirmada' && (
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                         <button
                           className="btn btn-secondary btn-sm"
-                          style={{ color: '#ef4444' }}
-                          onClick={() => handleCancelReservation(res.id, res.space_name, res.start_time)}
+                          type="button"
+                          onClick={() => openReservationModal({ mode: 'edit', reservation: res })}
                         >
-                          <Ban size={14} /> Cancelar
+                          <Edit3 size={14} /> Editar
                         </button>
-                      )}
+                        {res.status === 'CONFIRMED' && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            type="button"
+                            style={{ color: '#ef4444' }}
+                            onClick={() => handleCancelReservation(res.id, res.space_name, res.start_time)}
+                          >
+                            <Ban size={14} /> Cancelar
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          type="button"
+                          style={{ color: '#ef4444' }}
+                          onClick={() => handleDeleteReservation(res)}
+                        >
+                          <Trash2 size={14} /> Excluir
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -384,19 +741,19 @@ export default function ReservationsView({ showToast }) {
         </div>
       </div>
 
-      {/* Modal de Confirmação de Reserva */}
-      {isModalOpen && selectedSlot && (
+      {isReservationModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CalendarDays size={20} color="var(--accent-primary)" /> Confirmar Reserva de 1 Hora
+                <CalendarDays size={20} color="var(--accent-primary)" />
+                {reservationMode === 'edit' ? 'Editar Reserva' : 'Confirmar Reserva de 1 Hora'}
               </h3>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsModalOpen(false)}>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsReservationModalOpen(false)}>
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreateReservation}>
+            <form onSubmit={handleSaveReservation}>
               <div className="modal-body">
                 <div style={{
                   background: 'rgba(59, 130, 246, 0.1)',
@@ -405,15 +762,59 @@ export default function ReservationsView({ showToast }) {
                   borderRadius: 'var(--radius-md)',
                   marginBottom: '18px'
                 }}>
-                  <div style={{ fontWeight: '800', fontSize: '1.1rem', color: 'var(--text-main)' }}>{activeSpace.name}</div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    Data: <strong>{selectedDate}</strong> • Horário: <strong>{selectedSlot.start} às {selectedSlot.end} (1 hora)</strong>
+                  <div style={{ fontWeight: '800', fontSize: '1.1rem', color: 'var(--text-main)' }}>
+                    {spaces.find(space => space.id === parseInt(reservationForm.space_id, 10))?.name || activeSpace?.name || 'Área selecionada'}
                   </div>
-                  {activeSpace.fee > 0 && (
-                    <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: '700', marginTop: '4px' }}>
-                      Taxa de uso: R$ {activeSpace.fee.toFixed(2)} (será debitada na taxa condominial)
-                    </div>
-                  )}
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Data: <strong>{reservationForm.reservation_date}</strong> • Horário: <strong>{reservationForm.start_time} às {reservationForm.end_time}</strong>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Área Comum *</label>
+                  <select
+                    className="form-control"
+                    required
+                    value={reservationForm.space_id}
+                    onChange={(e) => handleReservationFieldChange('space_id', e.target.value)}
+                  >
+                    <option value="">Selecione a Área</option>
+                    {spaces.map((space) => (
+                      <option key={space.id} value={space.id}>{space.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Data da Reserva *</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    min={minReservationDate}
+                    value={reservationForm.reservation_date}
+                    onChange={(e) => handleReservationFieldChange('reservation_date', e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Hora Inicial *</label>
+                    <input
+                      type="time"
+                      className="form-control"
+                      value={reservationForm.start_time}
+                      onChange={(e) => handleReservationFieldChange('start_time', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label>Hora Final *</label>
+                    <input
+                      type="time"
+                      className="form-control"
+                      value={reservationForm.end_time}
+                      onChange={(e) => handleReservationFieldChange('end_time', e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -421,42 +822,41 @@ export default function ReservationsView({ showToast }) {
                   <select
                     className="form-control"
                     required
-                    value={unitIdInput}
-                    onChange={(e) => handleUnitChange(e.target.value)}
+                    value={reservationForm.unit_id}
+                    onChange={(e) => handleReservationFieldChange('unit_id', e.target.value)}
                   >
                     <option value="">Selecione o Apartamento</option>
-                    {units.map((u) => (
-                      <option key={u.id} value={u.id}>{u.block} - Apto {u.number}</option>
+                    {units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>{unit.block} - Apto {unit.number}</option>
                     ))}
                   </select>
                 </div>
 
-                {unitIdInput && (
+                {reservationForm.unit_id && (
                   <div className="form-group">
                     <label>Morador Responsável *</label>
                     <select
                       className="form-control"
                       required
-                      value={residentIdInput}
-                      onChange={(e) => setResidentIdInput(e.target.value)}
+                      value={reservationForm.resident_id}
+                      onChange={(e) => handleReservationFieldChange('resident_id', e.target.value)}
                     >
                       <option value="">Selecione o Morador</option>
-                      {residents.filter(r => r.unit_id === parseInt(unitIdInput, 10)).map((r) => (
-                        <option key={r.id} value={r.id}>{r.name} ({r.role})</option>
+                      {residents.filter(resident => resident.unit_id === parseInt(reservationForm.unit_id, 10)).map((resident) => (
+                        <option key={resident.id} value={resident.id}>{resident.name} ({resident.role})</option>
                       ))}
                     </select>
                   </div>
                 )}
 
                 <div className="form-group">
-                  <label>Número Estimado de Convidados (Capacidade máxima: {activeSpace.capacity})</label>
+                  <label>Número Estimado de Convidados</label>
                   <input
                     type="number"
                     className="form-control"
                     min="0"
-                    max={activeSpace.capacity}
-                    value={guestsCount}
-                    onChange={(e) => setGuestsCount(parseInt(e.target.value, 10) || 0)}
+                    value={reservationForm.guests_count}
+                    onChange={(e) => handleReservationFieldChange('guests_count', e.target.value)}
                   />
                 </div>
 
@@ -466,18 +866,18 @@ export default function ReservationsView({ showToast }) {
                     className="form-control"
                     rows="2"
                     placeholder="Ex: Treino particular, almoço de família..."
-                    value={notesInput}
-                    onChange={(e) => setNotesInput(e.target.value)}
-                  ></textarea>
+                    value={reservationForm.notes}
+                    onChange={(e) => handleReservationFieldChange('notes', e.target.value)}
+                  />
                 </div>
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsReservationModalOpen(false)}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Confirmar Agendamento (1h)
+                  {reservationMode === 'edit' ? 'Salvar Alterações' : 'Confirmar Agendamento (1h)'}
                 </button>
               </div>
             </form>

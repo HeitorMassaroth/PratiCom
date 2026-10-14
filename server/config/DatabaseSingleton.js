@@ -68,6 +68,8 @@ class DatabaseSingleton {
     addColumnIfMissing('market_products', 'cost_price REAL');
     addColumnIfMissing('market_products', 'min_stock INTEGER DEFAULT 5');
     addColumnIfMissing('market_products', 'image_url TEXT');
+    addColumnIfMissing('reservations', 'guests_count INTEGER DEFAULT 0');
+    addColumnIfMissing('reservations', 'notes TEXT');
 
     // Padroniza status de encomendas gravados em maiúsculas por versões anteriores do DAO.
     const deliveriesExists = this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'deliveries'").get();
