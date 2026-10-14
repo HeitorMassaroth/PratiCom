@@ -154,6 +154,37 @@ C. PADRÃO FACTORY METHOD (3 Fábricas Centrais do Sistema)
      * server/dao/DeliveryDAO.js
      * server/dao/OperationsDAO.js
 
+--------------------------------------------------------------------------------
+D. PADRÃO REPOSITORY & TÉCNICA DE COMPACTAÇÃO DE CÓDIGO (REUSO AVANÇADO)
+--------------------------------------------------------------------------------
+
+1. BaseRepository (Repositório Genérico Reutilizável)
+   - Arquivo: server/repositories/BaseRepository.js
+   - Função:
+     Unifica e compacta as operações fundamentais de persistência (findById,
+     findAll, create, update, delete, count, exists) para qualquer entidade relacional.
+     Aplica técnica de compactação através de metaprogramação, gerando dinamicamente
+     queries parametrizadas com Prepared Statements do SQLite.
+     Elimina a necessidade de escrever SQL manual repetitivo em cada DAO.
+   - Herança:
+     Herda de AbstractTenantDAO, garantindo que qualquer operação do repositório
+     esteja automaticamente protegida por escopo multi-tenant.
+
+2. RepositoryFactory
+   - Arquivo: server/repositories/RepositoryFactory.js
+   - Função:
+     Fábrica desacoplada que instancia repositórios genéricos ou especializados
+     ('residents', 'deliveries', 'financial', 'condominiums', 'blocks', etc.).
+
+3. Repositórios Especializados
+   - Arquivos:
+     * server/repositories/ResidentRepository.js
+     * server/repositories/DeliveryRepository.js
+     * server/repositories/FinancialRepository.js
+   - Função:
+     Estendem BaseRepository, herdando todas as operações CRUD básicas sem duplicar
+     uma única linha de SQL, implementando apenas regras e JOINs específicos de domínio.
+
 
 ================================================================================
 2. CATÁLOGO COMPLETO DE CRUDS DO SISTEMA

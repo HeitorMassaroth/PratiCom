@@ -1,13 +1,18 @@
 import { AbstractTenantDAO } from './AbstractTenantDAO.js';
 import { CreateResidentOperation } from '../services/templates/EntityOperationTemplate.js';
+import { ResidentRepository } from '../repositories/ResidentRepository.js';
+import { BaseRepository } from '../repositories/BaseRepository.js';
 
 /**
  * Padrão de Projeto: DAO (Data Access Object) com herança de AbstractTenantDAO
  * Isolamento e abstração do acesso aos dados de Unidades, Moradores e Veículos no SQLite.
+ * Integrado ao Padrão REPOSITORY para compactação de código focada em reuso.
  */
 export class ResidentDAO extends AbstractTenantDAO {
   constructor() {
     super();
+    this.residentRepo = new ResidentRepository();
+    this.vehicleRepo = new BaseRepository('vehicles', { primaryKey: 'id', isTenantDirect: false });
   }
 
   getUnits({ condominiumId } = {}) {
@@ -274,9 +279,7 @@ export class ResidentDAO extends AbstractTenantDAO {
       if (!existing) return false;
     }
 
-    const stmt = this.db.prepare('DELETE FROM residents WHERE id = ?');
-    const info = stmt.run(rId);
-    return info.changes > 0;
+    return this.residentRepo.delete(rId);
   }
 
   getVehicles({ condominiumId } = {}) {
@@ -408,8 +411,6 @@ export class ResidentDAO extends AbstractTenantDAO {
     if (!existing) {
       throw new Error('Veículo não encontrado ou não pertence a este condomínio.');
     }
-    const stmt = this.db.prepare('DELETE FROM vehicles WHERE id = ?');
-    const info = stmt.run(vId);
-    return info.changes > 0;
+    return this.vehicleRepo.delete(vId);
   }
 }

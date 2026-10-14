@@ -1,14 +1,17 @@
 import { AbstractTenantDAO } from './AbstractTenantDAO.js';
 import { FinancialReportGenerator } from '../services/templates/ReportTemplate.js';
+import { FinancialRepository } from '../repositories/FinancialRepository.js';
 
 /**
  * Padrão de Projeto: DAO (Data Access Object) com herança de AbstractTenantDAO
  * Abstração e persistência relacional de dados financeiros condominiais no SQLite.
+ * Integrado ao Padrão REPOSITORY para compactação e reuso de consultas contábeis.
  */
 export class FinancialDAO extends AbstractTenantDAO {
   constructor() {
     super();
     this.reportGenerator = new FinancialReportGenerator(this.db);
+    this.financialRepo = new FinancialRepository();
   }
 
   transactionScope(condominiumId) {

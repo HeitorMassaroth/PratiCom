@@ -1,15 +1,18 @@
 import { AbstractTenantDAO } from './AbstractTenantDAO.js';
 import { CreateDeliveryOperation } from '../services/templates/EntityOperationTemplate.js';
 import { NotificationDispatcherFactory } from '../services/factories/NotificationDispatcherFactory.js';
+import { DeliveryRepository } from '../repositories/DeliveryRepository.js';
 
 /**
  * Padrão de Projeto: DAO (Data Access Object) com herança de AbstractTenantDAO
  * Abstração e persistência relacional de encomendas recebidas na portaria.
+ * Integrado ao Padrão REPOSITORY para compactação de código focada em reuso.
  */
 export class DeliveryDAO extends AbstractTenantDAO {
   constructor() {
     super();
     this.notifier = NotificationDispatcherFactory.createDispatcher('delivery');
+    this.deliveryRepo = new DeliveryRepository();
   }
 
   // Utiliza o Template Method unitTenantScope da classe base
@@ -116,8 +119,7 @@ export class DeliveryDAO extends AbstractTenantDAO {
   deleteDelivery(id, condominiumId) {
     const delivery = this.getDelivery(id, condominiumId);
     if (!delivery) return false;
-    const result = this.db.prepare('DELETE FROM deliveries WHERE id = ?').run(delivery.id);
-    return result.changes > 0;
+    return this.deliveryRepo.delete(delivery.id);
   }
 
   pickupDelivery(id, { pickup_code, picked_up_by }, condominiumId) {
