@@ -21,6 +21,16 @@ class AppConfigSingleton {
     AppConfigSingleton.instance = this;
   }
 
+  /**
+   * Padrão GoF Singleton: Ponto de acesso global estático canônico.
+   */
+  static getInstance() {
+    if (!AppConfigSingleton.instance) {
+      new AppConfigSingleton();
+    }
+    return AppConfigSingleton.instance;
+  }
+
   ensureFeatures() {
     const insert = this.db.prepare(`
       INSERT OR IGNORE INTO app_features (feature, enabled)

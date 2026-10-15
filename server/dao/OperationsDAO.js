@@ -1,5 +1,6 @@
 import { AbstractTenantDAO } from './AbstractTenantDAO.js';
 import { NotificationDispatcherFactory } from '../services/factories/NotificationDispatcherFactory.js';
+import { AccessLog, Announcement } from '../domain/index.js';
 
 /**
  * Módulo DAO Consolidado de Operações (Portaria & Mural de Comunicados)
@@ -50,9 +51,10 @@ export class AccessDAO extends AbstractTenantDAO {
   registerEntry(data) {
     const rawUnitId = data.destination_unit_id || data.unit_id;
     const unitId = parseInt(rawUnitId, 10);
-    if (!Number.isInteger(unitId) || unitId <= 0) {
-      throw new Error('Unidade de destino é obrigatória.');
-    }
+
+    // Integridade via Entidade de Domínio (DDD)
+    const accessEntity = new AccessLog({ ...data, destination_unit_id: unitId });
+    accessEntity.validate();
 
     const stmt = this.db.prepare(`
       INSERT INTO access_logs (
@@ -172,12 +174,17 @@ export class AnnouncementDAO extends AbstractTenantDAO {
   }
 
   createAnnouncement(data, condominiumId) {
+    const condoId = data?.condominium_id || condominiumId || null;
+
+    // Integridade via Entidade de Domínio (DDD)
+    const announcementEntity = new Announcement({ ...data, condominium_id: condoId });
+    announcementEntity.validate();
+
     const stmt = this.db.prepare(`
       INSERT INTO announcements (condominium_id, title, content, category, priority, author, target_block, is_pinned, expires_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const condoId = data?.condominium_id || condominiumId || null;
     const info = stmt.run(
       condoId ? parseInt(condoId, 10) : null,
       data.title,

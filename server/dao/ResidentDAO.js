@@ -2,6 +2,7 @@ import { AbstractTenantDAO } from './AbstractTenantDAO.js';
 import { CreateResidentOperation } from '../services/templates/EntityOperationTemplate.js';
 import { ResidentRepository } from '../repositories/ResidentRepository.js';
 import { BaseRepository } from '../repositories/BaseRepository.js';
+import { Unit, Vehicle } from '../domain/index.js';
 
 /**
  * Padrão de Projeto: DAO (Data Access Object) com herança de AbstractTenantDAO
@@ -51,9 +52,10 @@ export class ResidentDAO extends AbstractTenantDAO {
   }
 
   createUnit(data, { condominiumId } = {}) {
-    if (!data.number || !String(data.number).trim()) {
-      throw new Error('Número da unidade é obrigatório.');
-    }
+    // Validação e Integridade de Domínio (DDD)
+    const unitEntity = new Unit(data);
+    unitEntity.validate();
+
     const blockId = data.block_id ? parseInt(data.block_id, 10) : null;
     if (!blockId) {
       throw new Error('Bloco é obrigatório.');
@@ -328,12 +330,10 @@ export class ResidentDAO extends AbstractTenantDAO {
   }
 
   createVehicle(data, condominiumId) {
-    if (!data.plate || !String(data.plate).trim()) {
-      throw new Error('Placa do veículo é obrigatória.');
-    }
-    if (!data.model || !String(data.model).trim()) {
-      throw new Error('Modelo/marca do veículo é obrigatório.');
-    }
+    // Validação e Integridade de Domínio (DDD)
+    const vehicleEntity = new Vehicle(data);
+    vehicleEntity.validate();
+
     const unitId = parseInt(data.unit_id, 10);
     if (!unitId) {
       throw new Error('Unidade é obrigatória.');

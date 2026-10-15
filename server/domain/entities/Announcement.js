@@ -10,7 +10,7 @@ export class Announcement extends BaseDomainEntity {
     this._condominiumId = data.condominium_id !== undefined ? Number(data.condominium_id) : (data.condominiumId !== undefined ? Number(data.condominiumId) : null);
     this._blockId = data.block_id !== undefined && data.block_id !== null ? Number(data.block_id) : (data.blockId !== undefined && data.blockId !== null ? Number(data.blockId) : null);
     this._title = data.title ? String(data.title).trim() : '';
-    this._message = data.message ? String(data.message).trim() : '';
+    this._message = data.content ? String(data.content).trim() : (data.message ? String(data.message).trim() : '');
     this._priority = data.priority ? String(data.priority).trim().toUpperCase() : 'NORMAL';
     this._pinned = Boolean(data.pinned === 1 || data.pinned === true);
     this._author = data.author ? String(data.author).trim() : 'Administração';

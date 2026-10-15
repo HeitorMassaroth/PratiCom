@@ -1,4 +1,5 @@
 import { AbstractTenantDAO } from './AbstractTenantDAO.js';
+import { Condominium, Block } from '../domain/index.js';
 
 const id = (value) => Number.parseInt(value, 10);
 
@@ -28,7 +29,10 @@ export class CondominiumDAO extends AbstractTenantDAO {
   }
 
   createCondominium(data) {
-    if (!data.name?.trim()) throw new Error('Nome do condomínio é obrigatório.');
+    // Validação e Integridade de Domínio (DDD)
+    const condoEntity = new Condominium(data);
+    condoEntity.validate();
+
     const info = this.db.prepare(`INSERT INTO condominiums (name, cnpj, address, city, state, postal_code, phone)
       VALUES (?, ?, ?, ?, ?, ?, ?)`).run(data.name.trim(), data.cnpj || null, data.address || null, data.city || null, data.state || null, data.postal_code || null, data.phone || null);
 
@@ -81,7 +85,10 @@ export class CondominiumDAO extends AbstractTenantDAO {
     const condominium = this.getCondominium(condominiumId);
     if (!condominium) throw new Error('Condomínio não encontrado.');
     if (condominium.status !== 'ACTIVE') throw new Error('Condomínio inativo não aceita novos blocos.');
-    if (!data.name?.trim()) throw new Error('Nome do bloco é obrigatório.');
+
+    // Validação e Integridade de Domínio (DDD)
+    const blockEntity = new Block({ ...data, condominium_id: id(condominiumId) });
+    blockEntity.validate();
 
     const trimmedName = data.name.trim();
     const existing = this.db.prepare(

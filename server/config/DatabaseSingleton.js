@@ -36,6 +36,20 @@ class DatabaseSingleton {
     DatabaseSingleton.instance = this;
   }
 
+  /**
+   * Padrão GoF Singleton: Ponto de acesso global estático canônico.
+   */
+  static getInstance() {
+    if (!DatabaseSingleton.instance) {
+      new DatabaseSingleton();
+    }
+    return DatabaseSingleton.instance;
+  }
+
+  static getDb() {
+    return DatabaseSingleton.getInstance().db;
+  }
+
   getDb() {
     return this.db;
   }
