@@ -32,13 +32,16 @@ class AppConfigSingleton {
   }
 
   ensureFeatures() {
-    const insert = this.db.prepare(`
-      INSERT OR IGNORE INTO app_features (feature, enabled)
+    const upsert = this.db.prepare(`
+      INSERT INTO app_features (feature, enabled)
       VALUES (?, ?)
+      ON CONFLICT(feature) DO UPDATE SET
+        enabled = excluded.enabled,
+        updated_at = CURRENT_TIMESTAMP
     `);
 
     for (const [feature, enabled] of Object.entries(DEFAULT_FEATURES)) {
-      insert.run(feature, enabled ? 1 : 0);
+      upsert.run(feature, enabled ? 1 : 0);
     }
   }
 
