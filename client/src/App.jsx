@@ -11,6 +11,8 @@ import FinancialView from './views/FinancialView';
 import MarketView from './views/MarketView';
 import AnnouncementsView from './views/AnnouncementsView';
 
+import Toast from './components/Toast';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [theme, setTheme] = useState(() => localStorage.getItem('praticom_theme') || 'dark');
@@ -54,6 +56,7 @@ export default function App() {
         <Header theme={theme} onToggleTheme={toggleTheme} />
         <main>{renderActiveView()}</main>
       </div>
+      <Toast />
     </div>
   );
 }

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, CheckCircle2, XCircle, KeyRound } from 'lucide-react';
+import { Package, Plus, CheckCircle2, XCircle, KeyRound, Search, Delete } from 'lucide-react';
 import api from '../services/api';
 import Modal from '../components/Modal';
+import { showToast } from '../components/Toast';
 
 export default function DeliveriesView() {
   const [deliveries, setDeliveries] = useState([]);
   const [units, setUnits] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   // Modais
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -19,14 +20,12 @@ export default function DeliveriesView() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const loadData = () => {
-    setLoading(true);
     Promise.all([api.get('/deliveries'), api.get('/units')])
       .then(([delData, unitData]) => {
         setDeliveries(delData || []);
         setUnits(unitData || []);
       })
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+      .catch((err) => console.error(err));
   };
 
   useEffect(() => {
@@ -39,9 +38,10 @@ export default function DeliveriesView() {
     e.preventDefault();
     setErrorMsg('');
     try {
-      await api.post('/deliveries', newForm);
+      const created = await api.post('/deliveries', newForm);
       setIsNewModalOpen(false);
       setNewForm({ unit_id: '', courier: '', tracking_code: '', description: '' });
+      showToast(`📦 Pacote recebido com sucesso! PIN de retirada: ${created.pickup_code}`);
       loadData();
     } catch (err) {
       setErrorMsg(err.message);
@@ -56,6 +56,7 @@ export default function DeliveriesView() {
       setIsPickupModalOpen(false);
       setSelectedDelivery(null);
       setPickupForm({ pickup_code: '', picked_up_by: '' });
+      showToast('🎉 Encomenda entregue e baixada com sucesso!');
       loadData();
     } catch (err) {
       setErrorMsg(err.message);
@@ -67,23 +68,57 @@ export default function DeliveriesView() {
     if (!reason) return;
     try {
       await api.patch(`/deliveries/${id}/cancel`, { reason });
+      showToast('Encomenda cancelada.', 'info');
       loadData();
     } catch (err) {
       alert(err.message);
     }
   };
 
+  const handleKeypadPress = (val) => {
+    if (val === 'DEL') {
+      setPickupForm((prev) => ({ ...prev, pickup_code: prev.pickup_code.slice(0, -1) }));
+    } else if (pickupForm.pickup_code.length < 4) {
+      setPickupForm((prev) => ({ ...prev, pickup_code: prev.pickup_code + val }));
+    }
+  };
+
+  const filtered = deliveries.filter((d) => {
+    const term = search.toLowerCase();
+    return (
+      d.courier?.toLowerCase().includes(term) ||
+      d.unit_number?.toString().includes(term) ||
+      d.tracking_code?.toLowerCase().includes(term) ||
+      d.resident_name?.toLowerCase().includes(term)
+    );
+  });
+
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1>Gestão de Encomendas na Portaria</h1>
-          <p>Controle de recebimento de pacotes, rastreio e entrega segura por PIN.</p>
+          <h1>Gestão de Encomendas & Armário Digital</h1>
+          <p>Recebimento rápido de pacotes, rastreio unificado e liberação por PIN de 4 dígitos.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
           <Plus size={18} />
           <span>Receber Pacote</span>
         </button>
+      </div>
+
+      {/* Barra de Busca e Filtros */}
+      <div style={{ marginBottom: '22px', display: 'flex', gap: '14px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1, maxWidth: '420px' }}>
+          <Search size={18} style={{ position: 'absolute', left: 14, top: 14, color: 'var(--text-muted)' }} />
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Buscar por transportadora, morador, unidade..."
+            style={{ paddingLeft: '42px' }}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="glass-card table-responsive">
@@ -94,36 +129,38 @@ export default function DeliveriesView() {
               <th>Destinatário / Unidade</th>
               <th>Transportadora</th>
               <th>Código / Rastreio</th>
-              <th>PIN Retirada</th>
+              <th>PIN Armário</th>
               <th>Status</th>
               <th>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {deliveries.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
-                  Nenhuma encomenda cadastrada neste condomínio.
+                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  Nenhuma encomenda encontrada com os filtros informados.
                 </td>
               </tr>
             ) : (
-              deliveries.map((d) => (
+              filtered.map((d) => (
                 <tr key={d.id}>
-                  <td>#{d.id}</td>
+                  <td><strong>#{d.id}</strong></td>
                   <td>
-                    <strong>Apto {d.unit_number || d.unit_id}</strong>
-                    {d.block_name && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block' }}>{d.block_name}</span>}
+                    <div><strong>Apto {d.unit_number || d.unit_id}</strong></div>
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      {d.resident_name || d.block_name || 'Morador'}
+                    </small>
                   </td>
-                  <td>{d.courier}</td>
-                  <td>{d.tracking_code || '-'}</td>
+                  <td><strong>{d.courier}</strong></td>
+                  <td>{d.tracking_code || <span style={{ color: 'var(--text-dim)' }}>Não informado</span>}</td>
                   <td>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, letterSpacing: '2px', background: 'var(--bg-surface)', padding: '4px 8px', borderRadius: '4px' }}>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 800, letterSpacing: '3px', background: 'var(--bg-surface)', padding: '6px 10px', borderRadius: '6px', fontSize: '1rem', color: 'var(--primary)' }}>
                       {d.pickup_code}
                     </span>
                   </td>
                   <td>
-                    {d.status === 'PENDING' && <span className="badge badge-warning">Pendente</span>}
-                    {d.status === 'PICKED_UP' && <span className="badge badge-success">Entregue</span>}
+                    {d.status === 'PENDING' && <span className="badge badge-warning">Aguardando Retirada</span>}
+                    {d.status === 'PICKED_UP' && <span className="badge badge-success">Retirada Concluída</span>}
                     {d.status === 'CANCELLED' && <span className="badge badge-danger">Cancelada</span>}
                   </td>
                   <td>
@@ -131,22 +168,23 @@ export default function DeliveriesView() {
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button
                           className="btn btn-success"
-                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                          style={{ padding: '7px 14px', fontSize: '0.82rem' }}
                           onClick={() => {
                             setSelectedDelivery(d);
+                            setPickupForm({ pickup_code: '', picked_up_by: '' });
                             setIsPickupModalOpen(true);
                           }}
                         >
-                          <KeyRound size={14} />
-                          <span>Baixar PIN</span>
+                          <KeyRound size={15} />
+                          <span>Liberar PIN</span>
                         </button>
                         <button
                           className="btn btn-danger"
-                          style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                          style={{ padding: '7px 10px', fontSize: '0.82rem' }}
                           onClick={() => handleCancel(d.id)}
                           title="Cancelar Encomenda"
                         >
-                          <XCircle size={14} />
+                          <XCircle size={15} />
                         </button>
                       </div>
                     )}
@@ -158,7 +196,7 @@ export default function DeliveriesView() {
         </table>
       </div>
 
-      {/* Modal de Nova Encomenda */}
+      {/* Modal Nova Encomenda */}
       <Modal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} title="Registrar Nova Encomenda">
         <form onSubmit={handleCreate}>
           {errorMsg && <div className="badge badge-danger" style={{ marginBottom: 16, width: '100%' }}>{errorMsg}</div>}
@@ -177,11 +215,11 @@ export default function DeliveriesView() {
             </select>
           </div>
           <div className="form-group">
-            <label>Transportadora / Entregador *</label>
+            <label>Transportadora ou Entregador *</label>
             <input
               type="text"
               className="form-control"
-              placeholder="Ex: Mercado Livre, Amazon, Correios..."
+              placeholder="Ex: Mercado Livre, Amazon, Jadlog, Correios..."
               value={newForm.courier}
               onChange={(e) => setNewForm({ ...newForm, courier: e.target.value })}
               required
@@ -202,51 +240,75 @@ export default function DeliveriesView() {
             <input
               type="text"
               className="form-control"
-              placeholder="Ex: Caixa média, envelope..."
+              placeholder="Ex: Caixa média, envelope de documentos..."
               value={newForm.description}
               onChange={(e) => setNewForm({ ...newForm, description: e.target.value })}
             />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setIsNewModalOpen(false)}>Cancelar</button>
             <button type="submit" className="btn btn-primary">Registrar e Gerar PIN</button>
           </div>
         </form>
       </Modal>
 
-      {/* Modal de Baixa com PIN */}
-      <Modal isOpen={isPickupModalOpen} onClose={() => setIsPickupModalOpen(false)} title="Confirmar Retirada de Encomenda">
+      {/* Modal Baixa com PIN e Keypad Interativo */}
+      <Modal isOpen={isPickupModalOpen} onClose={() => setIsPickupModalOpen(false)} title="Liberar Pacote por PIN">
         <form onSubmit={handlePickup}>
           {errorMsg && <div className="badge badge-danger" style={{ marginBottom: 16, width: '100%' }}>{errorMsg}</div>}
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Para liberar a entrega da encomenda #{selectedDelivery?.id}, insira o código PIN de 4 dígitos informado pelo morador.
-          </p>
-          <div className="form-group">
-            <label>Código PIN de 4 Dígitos *</label>
-            <input
-              type="text"
-              maxLength={4}
-              className="form-control"
-              placeholder="Ex: 4821"
-              value={pickupForm.pickup_code}
-              onChange={(e) => setPickupForm({ ...pickupForm, pickup_code: e.target.value })}
-              style={{ fontSize: '1.4rem', textAlign: 'center', letterSpacing: '6px', fontWeight: 700 }}
-              required
-            />
+          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)' }}>
+              Digite o PIN informado pelo morador do <strong>Apto {selectedDelivery?.unit_number}</strong>:
+            </p>
+            <div
+              style={{
+                fontSize: '2.2rem',
+                fontFamily: 'monospace',
+                fontWeight: 800,
+                letterSpacing: '12px',
+                padding: '12px',
+                background: 'var(--bg-app)',
+                borderRadius: 'var(--radius-md)',
+                marginTop: '10px',
+                color: 'var(--primary)'
+              }}
+            >
+              {pickupForm.pickup_code.padEnd(4, '•')}
+            </div>
           </div>
-          <div className="form-group">
-            <label>Nome de quem retirou (Opcional)</label>
+
+          {/* Teclado Virtual Numérico Tátil */}
+          <div className="pin-keypad">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'DEL'].map((k, idx) => (
+              k === '' ? <div key={idx} /> : (
+                <button
+                  key={k}
+                  type="button"
+                  className="pin-key"
+                  onClick={() => handleKeypadPress(k)}
+                >
+                  {k}
+                </button>
+              )
+            ))}
+          </div>
+
+          <div className="form-group" style={{ marginTop: '14px' }}>
+            <label>Retirado por (Opcional)</label>
             <input
               type="text"
               className="form-control"
-              placeholder="Ex: Próprio morador, Cônjuge..."
+              placeholder="Ex: Próprio morador, familiar..."
               value={pickupForm.picked_up_by}
               onChange={(e) => setPickupForm({ ...pickupForm, picked_up_by: e.target.value })}
             />
           </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsPickupModalOpen(false)}>Voltar</button>
-            <button type="submit" className="btn btn-success">Confirmar Baixa</button>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsPickupModalOpen(false)}>Cancelar</button>
+            <button type="submit" className="btn btn-success" disabled={pickupForm.pickup_code.length !== 4}>
+              Confirmar e Liberar Pacote
+            </button>
           </div>
         </form>
       </Modal>
