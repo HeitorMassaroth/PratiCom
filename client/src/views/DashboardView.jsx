@@ -5,12 +5,12 @@ import {
   DollarSign,
   Calendar,
   AlertTriangle,
-  ArrowUpRight,
+  ArrowRight,
   Megaphone,
-  TrendingUp,
+  ShoppingBag,
   Activity,
-  Sparkles,
-  ShoppingBag
+  Layers,
+  CheckCircle2
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -22,7 +22,7 @@ export default function DashboardView({ onNavigate }) {
     setLoading(true);
     api.get('/dashboard')
       .then((res) => setData(res))
-      .catch((err) => console.error(err))
+      .catch((err) => console.error('Erro ao carregar dashboard:', err))
       .finally(() => setLoading(false));
   };
 
@@ -32,19 +32,12 @@ export default function DashboardView({ onNavigate }) {
     return () => window.removeEventListener('condo-changed', loadDashboard);
   }, []);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bom dia';
-    if (hour < 18) return 'Boa tarde';
-    return 'Boa noite';
-  };
-
   if (loading) {
     return (
-      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
         <div style={{ textAlign: 'center' }}>
-          <Activity size={36} className="pulse-dot" style={{ width: 36, height: 36, background: 'var(--primary)' }} />
-          <p style={{ marginTop: '16px', color: 'var(--text-muted)', fontWeight: 600 }}>Sincronizando dados em tempo real...</p>
+          <Activity size={32} color="var(--primary)" style={{ animation: 'spin 1.5s linear infinite', margin: '0 auto' }} />
+          <p style={{ marginTop: '14px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Carregando dados operacionais...</p>
         </div>
       </div>
     );
@@ -55,151 +48,207 @@ export default function DashboardView({ onNavigate }) {
 
   return (
     <div className="page-container">
-      {/* Hero Header */}
-      <div className="page-header" style={{ marginBottom: '28px' }}>
+      {/* Header Operacional */}
+      <div className="page-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span className="pulse-dot"></span>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--success)', letterSpacing: '0.06em' }}>
-              Painel Operacional Ativo
-            </span>
-          </div>
-          <h1>{getGreeting()}, Síndico(a)! 👋</h1>
-          <p>Visão executiva em tempo real com governança, segurança e saúde financeira do condomínio.</p>
+          <h1>Painel Executivo & Operacional</h1>
+          <p>Visão consolidada de portaria, encomendas, fluxo de caixa e áreas comuns do condomínio.</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn btn-secondary" onClick={() => onNavigate('deliveries')}>
+            <Package size={16} />
+            <span>Portaria</span>
+          </button>
           <button className="btn btn-primary" onClick={() => onNavigate('market')}>
-            <ShoppingBag size={18} />
-            <span>Abrir PDV Express</span>
+            <ShoppingBag size={16} />
+            <span>Terminal PDV</span>
           </button>
         </div>
       </div>
 
-      {/* Grid de Métricas Principais */}
+      {/* Alerta de Estoque Crítico (se houver) */}
+      {m.lowStockItems > 0 && (
+        <div style={{
+          background: 'var(--warning-bg)',
+          border: '1px solid var(--warning-border)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '20px',
+          color: 'var(--warning)',
+          fontSize: '0.86rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600 }}>
+            <AlertTriangle size={18} />
+            <span>Atenção: {m.lowStockItems} {m.lowStockItems === 1 ? 'produto está' : 'produtos estão'} com estoque igual ou abaixo do nível mínimo no Mercadinho Autônomo.</span>
+          </div>
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={() => onNavigate('market')}
+            style={{ borderColor: 'var(--warning-border)', color: 'var(--warning)' }}
+          >
+            Gerenciar Estoque
+          </button>
+        </div>
+      )}
+
+      {/* Grid de KPIs Operacionais */}
       <div className="metrics-grid">
-        <div className="glass-card stat-card" onClick={() => onNavigate('deliveries')} style={{ cursor: 'pointer' }}>
+        <div className="stat-card" onClick={() => onNavigate('deliveries')} style={{ cursor: 'pointer' }}>
           <div className="stat-icon" style={{ background: 'var(--warning-bg)', color: 'var(--warning)' }}>
-            <Package size={28} />
+            <Package size={22} />
           </div>
           <div className="stat-info">
-            <div className="stat-value">{m.pendingDeliveries || 0}</div>
-            <div className="stat-label">Encomendas Aguardando</div>
+            <span className="stat-label">Encomendas Aguardando</span>
+            <span className="stat-value">{m.pendingDeliveries || 0}</span>
           </div>
         </div>
 
-        <div className="glass-card stat-card" onClick={() => onNavigate('access')} style={{ cursor: 'pointer' }}>
+        <div className="stat-card" onClick={() => onNavigate('access')} style={{ cursor: 'pointer' }}>
           <div className="stat-icon" style={{ background: 'var(--success-bg)', color: 'var(--success)' }}>
-            <ShieldCheck size={28} />
+            <ShieldCheck size={22} />
           </div>
           <div className="stat-info">
-            <div className="stat-value">{m.activeVisitors || 0}</div>
-            <div className="stat-label">Visitantes na Propriedade</div>
+            <span className="stat-label">Visitantes no Perímetro</span>
+            <span className="stat-value">{m.activeVisitors || 0}</span>
           </div>
         </div>
 
-        <div className="glass-card stat-card" onClick={() => onNavigate('financial')} style={{ cursor: 'pointer' }}>
-          <div className="stat-icon" style={{ background: 'rgba(99, 102, 241, 0.16)', color: 'var(--primary)' }}>
-            <DollarSign size={28} />
+        <div className="stat-card" onClick={() => onNavigate('financial')} style={{ cursor: 'pointer' }}>
+          <div className="stat-icon" style={{ background: 'var(--primary-subtle)', color: 'var(--primary)' }}>
+            <DollarSign size={22} />
           </div>
           <div className="stat-info">
-            <div className="stat-value">R$ {Number(m.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-            <div className="stat-label">Saldo em Caixa Atual</div>
+            <span className="stat-label">Saldo em Caixa Real</span>
+            <span className="stat-value" style={{ color: (m.balance || 0) >= 0 ? 'var(--text-main)' : 'var(--danger)' }}>
+              R$ {Number(m.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </span>
           </div>
         </div>
 
-        <div className="glass-card stat-card" onClick={() => onNavigate('reservations')} style={{ cursor: 'pointer' }}>
+        <div className="stat-card" onClick={() => onNavigate('reservations')} style={{ cursor: 'pointer' }}>
           <div className="stat-icon" style={{ background: 'var(--info-bg)', color: 'var(--info)' }}>
-            <Calendar size={28} />
+            <Calendar size={22} />
           </div>
           <div className="stat-info">
-            <div className="stat-value">{m.todayReservations || 0}</div>
-            <div className="stat-label">Eventos / Reservas Hoje</div>
+            <span className="stat-label">Reservas para Hoje</span>
+            <span className="stat-value">{m.todayReservations || 0}</span>
           </div>
         </div>
       </div>
 
-      {/* Seção Central: Alertas Críticos + Resumo Operacional */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
-        {/* Mural de Avisos com Destaque Visual */}
-        <div className="glass-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem' }}>
-              <Megaphone size={22} color="var(--primary)" />
-              <span>Comunicados Fixados & Urgentes</span>
+      {/* Seção Bipartida: Alertas & Ações Rápidas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
+        {/* Painel de Comunicados */}
+        <div className="erp-panel">
+          <div className="panel-header">
+            <h3>
+              <Megaphone size={18} color="var(--primary)" />
+              <span>Comunicados & Avisos Importantes</span>
             </h3>
             <button
-              style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
+              className="btn btn-sm btn-outline"
               onClick={() => onNavigate('announcements')}
             >
-              Ver Mural Completo →
+              <span>Ver Mural</span>
+              <ArrowRight size={14} />
             </button>
           </div>
 
           {announcements.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
-              <Sparkles size={28} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
-              <p>Nenhum comunicado crítico ou urgente no momento.</p>
+            <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+              <CheckCircle2 size={24} style={{ margin: '0 auto 8px', color: 'var(--success)' }} />
+              <p>Nenhum comunicado urgente ou fixado pendente.</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {announcements.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    padding: '16px',
-                    borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-surface)',
-                    borderLeft: a.priority === 'urgente' || a.priority === 'alta' ? '4px solid var(--danger)' : '4px solid var(--primary)',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <h4 style={{ fontSize: '1rem', fontWeight: 700 }}>{a.title}</h4>
-                    <span className={`badge ${a.priority === 'urgente' || a.priority === 'alta' ? 'badge-danger' : 'badge-primary'}`}>
-                      {a.category}
-                    </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {announcements.map((a) => {
+                const isUrgent = a.priority === 'urgente' || a.priority === 'alta';
+                return (
+                  <div
+                    key={a.id}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-surface)',
+                      borderLeft: isUrgent ? '3px solid var(--danger)' : '3px solid var(--primary)',
+                      borderTop: '1px solid var(--border)',
+                      borderRight: '1px solid var(--border)',
+                      borderBottom: '1px solid var(--border)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <h4 style={{ fontSize: '0.92rem', fontWeight: 600 }}>{a.title}</h4>
+                      <span className={`badge ${isUrgent ? 'badge-danger' : 'badge-primary'}`}>
+                        {a.category}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: '1.45' }}>{a.content}</p>
                   </div>
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>{a.content}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Atalhos Rápidos e Módulos */}
-        <div className="glass-card">
-          <h3 style={{ marginBottom: '18px', fontSize: '1.2rem' }}>Ações Rápidas da Portaria e Gestão</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button className="btn btn-secondary" style={{ justifyContent: 'space-between', padding: '14px 18px' }} onClick={() => onNavigate('deliveries')}>
+        {/* Painel de Ações Rápidas */}
+        <div className="erp-panel">
+          <div className="panel-header">
+            <h3>
+              <Layers size={18} color="var(--primary)" />
+              <span>Atalhos Rápidos de Operação</span>
+            </h3>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              className="btn btn-secondary"
+              style={{ justifyContent: 'space-between', padding: '12px 16px' }}
+              onClick={() => onNavigate('deliveries')}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Package size={20} color="var(--warning)" />
+                <Package size={18} color="var(--warning)" />
                 <span style={{ fontWeight: 600 }}>Entregar Encomenda com PIN Seguro</span>
               </div>
-              <ArrowUpRight size={18} color="var(--text-muted)" />
+              <ArrowRight size={16} color="var(--text-dim)" />
             </button>
 
-            <button className="btn btn-secondary" style={{ justifyContent: 'space-between', padding: '14px 18px' }} onClick={() => onNavigate('access')}>
+            <button
+              className="btn btn-secondary"
+              style={{ justifyContent: 'space-between', padding: '12px 16px' }}
+              onClick={() => onNavigate('access')}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <ShieldCheck size={20} color="var(--success)" />
+                <ShieldCheck size={18} color="var(--success)" />
                 <span style={{ fontWeight: 600 }}>Registrar Entrada / Saída de Visitante</span>
               </div>
-              <ArrowUpRight size={18} color="var(--text-muted)" />
+              <ArrowRight size={16} color="var(--text-dim)" />
             </button>
 
-            <button className="btn btn-secondary" style={{ justifyContent: 'space-between', padding: '14px 18px' }} onClick={() => onNavigate('reservations')}>
+            <button
+              className="btn btn-secondary"
+              style={{ justifyContent: 'space-between', padding: '12px 16px' }}
+              onClick={() => onNavigate('financial')}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <Calendar size={20} color="var(--info)" />
-                <span style={{ fontWeight: 600 }}>Verificar Disponibilidade de Áreas Comuns</span>
+                <DollarSign size={18} color="var(--primary)" />
+                <span style={{ fontWeight: 600 }}>Visualizar Balancete & Baixa de Taxas</span>
               </div>
-              <ArrowUpRight size={18} color="var(--text-muted)" />
+              <ArrowRight size={16} color="var(--text-dim)" />
             </button>
 
-            <button className="btn btn-secondary" style={{ justifyContent: 'space-between', padding: '14px 18px' }} onClick={() => onNavigate('financial')}>
+            <button
+              className="btn btn-secondary"
+              style={{ justifyContent: 'space-between', padding: '12px 16px' }}
+              onClick={() => onNavigate('reservations')}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <DollarSign size={20} color="var(--primary)" />
-                <span style={{ fontWeight: 600 }}>Visualizar Balancete e Quitação de Taxas</span>
+                <Calendar size={18} color="var(--info)" />
+                <span style={{ fontWeight: 600 }}>Consultar Agenda de Áreas Comuns</span>
               </div>
-              <ArrowUpRight size={18} color="var(--text-muted)" />
+              <ArrowRight size={16} color="var(--text-dim)" />
             </button>
           </div>
         </div>

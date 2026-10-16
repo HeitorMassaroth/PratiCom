@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, CheckCircle2, XCircle, KeyRound, Search, Delete } from 'lucide-react';
+import { Package, Plus, CheckCircle2, XCircle, KeyRound, Search, AlertCircle, Delete, Clock, Check } from 'lucide-react';
 import api from '../services/api';
 import Modal from '../components/Modal';
 import { showToast } from '../components/Toast';
@@ -8,6 +8,7 @@ export default function DeliveriesView() {
   const [deliveries, setDeliveries] = useState([]);
   const [units, setUnits] = useState([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Modais
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -41,7 +42,7 @@ export default function DeliveriesView() {
       const created = await api.post('/deliveries', newForm);
       setIsNewModalOpen(false);
       setNewForm({ unit_id: '', courier: '', tracking_code: '', description: '' });
-      showToast(`📦 Pacote recebido com sucesso! PIN de retirada: ${created.pickup_code}`);
+      showToast(`Pacote registrado com sucesso. PIN do armário: ${created.pickup_code}`);
       loadData();
     } catch (err) {
       setErrorMsg(err.message);
@@ -56,7 +57,7 @@ export default function DeliveriesView() {
       setIsPickupModalOpen(false);
       setSelectedDelivery(null);
       setPickupForm({ pickup_code: '', picked_up_by: '' });
-      showToast('🎉 Encomenda entregue e baixada com sucesso!');
+      showToast('Baixa de encomenda confirmada com sucesso.');
       loadData();
     } catch (err) {
       setErrorMsg(err.message);
@@ -64,11 +65,11 @@ export default function DeliveriesView() {
   };
 
   const handleCancel = async (id) => {
-    const reason = prompt('Informe o motivo do cancelamento da encomenda:');
+    const reason = prompt('Informe a justificativa formal para cancelamento da encomenda:');
     if (!reason) return;
     try {
       await api.patch(`/deliveries/${id}/cancel`, { reason });
-      showToast('Encomenda cancelada.', 'info');
+      showToast('Encomenda cancelada com sucesso.', 'info');
       loadData();
     } catch (err) {
       alert(err.message);
@@ -78,12 +79,15 @@ export default function DeliveriesView() {
   const handleKeypadPress = (val) => {
     if (val === 'DEL') {
       setPickupForm((prev) => ({ ...prev, pickup_code: prev.pickup_code.slice(0, -1) }));
+    } else if (val === 'CLEAR') {
+      setPickupForm((prev) => ({ ...prev, pickup_code: '' }));
     } else if (pickupForm.pickup_code.length < 4) {
       setPickupForm((prev) => ({ ...prev, pickup_code: prev.pickup_code + val }));
     }
   };
 
   const filtered = deliveries.filter((d) => {
+    if (statusFilter !== 'ALL' && d.status !== statusFilter) return false;
     const term = search.toLowerCase();
     return (
       d.courier?.toLowerCase().includes(term) ||
@@ -98,96 +102,150 @@ export default function DeliveriesView() {
       <div className="page-header">
         <div>
           <h1>Gestão de Encomendas & Armário Digital</h1>
-          <p>Recebimento rápido de pacotes, rastreio unificado e liberação por PIN de 4 dígitos.</p>
+          <p>Recepção de volumes, controle de guarda na portaria e entrega autenticada por PIN de 4 dígitos.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setIsNewModalOpen(true)}>
-          <Plus size={18} />
-          <span>Receber Pacote</span>
+          <Plus size={16} />
+          <span>Receber Encomenda</span>
         </button>
       </div>
 
-      {/* Barra de Busca e Filtros */}
-      <div style={{ marginBottom: '22px', display: 'flex', gap: '14px', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: '420px' }}>
-          <Search size={18} style={{ position: 'absolute', left: 14, top: 14, color: 'var(--text-muted)' }} />
+      {/* Filtros e Busca */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', marginBottom: '18px', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', width: '360px' }}>
+          <Search size={16} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-dim)' }} />
           <input
             type="text"
             className="form-control"
-            placeholder="Buscar por transportadora, morador, unidade..."
-            style={{ paddingLeft: '42px' }}
+            placeholder="Buscar por morador, unidade, transportadora..."
+            style={{ paddingLeft: '36px' }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        <div className="segmented-tabs">
+          <button
+            className={`segmented-tab ${statusFilter === 'ALL' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('ALL')}
+          >
+            Todas ({deliveries.length})
+          </button>
+          <button
+            className={`segmented-tab ${statusFilter === 'PENDING' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('PENDING')}
+          >
+            Aguardando Retirada ({deliveries.filter((d) => d.status === 'PENDING').length})
+          </button>
+          <button
+            className={`segmented-tab ${statusFilter === 'PICKED_UP' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('PICKED_UP')}
+          >
+            Entregues ({deliveries.filter((d) => d.status === 'PICKED_UP').length})
+          </button>
+          <button
+            className={`segmented-tab ${statusFilter === 'CANCELLED' ? 'active' : ''}`}
+            onClick={() => setStatusFilter('CANCELLED')}
+          >
+            Canceladas ({deliveries.filter((d) => d.status === 'CANCELLED').length})
+          </button>
+        </div>
       </div>
 
-      <div className="glass-card table-responsive">
+      {/* Tabela de Encomendas */}
+      <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Destinatário / Unidade</th>
+              <th style={{ width: '70px' }}>Protocolo</th>
+              <th>Destinatário</th>
               <th>Transportadora</th>
-              <th>Código / Rastreio</th>
-              <th>PIN Armário</th>
+              <th>Código de Rastreio</th>
+              <th style={{ textAlign: 'center' }}>PIN Armário</th>
+              <th>Data Recebimento</th>
               <th>Status</th>
-              <th>Ações</th>
+              <th style={{ textAlign: 'right' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                  Nenhuma encomenda encontrada com os filtros informados.
+                <td colSpan="8" style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                  Nenhuma encomenda encontrada com os filtros selecionados.
                 </td>
               </tr>
             ) : (
               filtered.map((d) => (
                 <tr key={d.id}>
-                  <td><strong>#{d.id}</strong></td>
+                  <td className="num-cell">#{d.id}</td>
                   <td>
-                    <div><strong>Apto {d.unit_number || d.unit_id}</strong></div>
-                    <small style={{ color: 'var(--text-muted)' }}>
-                      {d.resident_name || d.block_name || 'Morador'}
-                    </small>
+                    <div style={{ fontWeight: 600 }}>{d.resident_name || 'Destinatário não especificado'}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      Unidade {d.unit_number} {d.block_name ? `• ${d.block_name}` : ''}
+                    </div>
                   </td>
-                  <td><strong>{d.courier}</strong></td>
-                  <td>{d.tracking_code || <span style={{ color: 'var(--text-dim)' }}>Não informado</span>}</td>
                   <td>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 800, letterSpacing: '3px', background: 'var(--bg-surface)', padding: '6px 10px', borderRadius: '6px', fontSize: '1rem', color: 'var(--primary)' }}>
+                    <span style={{ fontWeight: 500 }}>{d.courier}</span>
+                    {d.description && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{d.description}</div>
+                    )}
+                  </td>
+                  <td className="num-cell" style={{ color: 'var(--text-muted)' }}>
+                    {d.tracking_code || '—'}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 700,
+                        letterSpacing: '0.12em',
+                        padding: '3px 8px',
+                        background: 'var(--bg-surface)',
+                        borderRadius: 'var(--radius-xs)',
+                        border: '1px solid var(--border)'
+                      }}
+                    >
                       {d.pickup_code}
                     </span>
                   </td>
-                  <td>
-                    {d.status === 'PENDING' && <span className="badge badge-warning">Aguardando Retirada</span>}
-                    {d.status === 'PICKED_UP' && <span className="badge badge-success">Retirada Concluída</span>}
-                    {d.status === 'CANCELLED' && <span className="badge badge-danger">Cancelada</span>}
+                  <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    {d.received_at ? new Date(d.received_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                   </td>
                   <td>
-                    {d.status === 'PENDING' && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          className="btn btn-success"
-                          style={{ padding: '7px 14px', fontSize: '0.82rem' }}
-                          onClick={() => {
-                            setSelectedDelivery(d);
-                            setPickupForm({ pickup_code: '', picked_up_by: '' });
-                            setIsPickupModalOpen(true);
-                          }}
-                        >
-                          <KeyRound size={15} />
-                          <span>Liberar PIN</span>
-                        </button>
-                        <button
-                          className="btn btn-danger"
-                          style={{ padding: '7px 10px', fontSize: '0.82rem' }}
-                          onClick={() => handleCancel(d.id)}
-                          title="Cancelar Encomenda"
-                        >
-                          <XCircle size={15} />
-                        </button>
-                      </div>
-                    )}
+                    {d.status === 'PENDING' && <span className="badge badge-warning">Aguardando</span>}
+                    {d.status === 'PICKED_UP' && <span className="badge badge-success">Retirado</span>}
+                    {d.status === 'CANCELLED' && <span className="badge badge-neutral">Cancelado</span>}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                      {d.status === 'PENDING' && (
+                        <>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => {
+                              setSelectedDelivery(d);
+                              setIsPickupModalOpen(true);
+                              setErrorMsg('');
+                            }}
+                          >
+                            <KeyRound size={13} />
+                            <span>Validar PIN</span>
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline"
+                            title="Cancelar recebimento"
+                            onClick={() => handleCancel(d.id)}
+                          >
+                            <XCircle size={13} color="var(--danger)" />
+                          </button>
+                        </>
+                      )}
+                      {d.status === 'PICKED_UP' && (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+                          Por: {d.picked_up_by || 'Titular'}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -196,121 +254,168 @@ export default function DeliveriesView() {
         </table>
       </div>
 
-      {/* Modal Nova Encomenda */}
-      <Modal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} title="Registrar Nova Encomenda">
+      {/* Modal 1: Receber Nova Encomenda */}
+      <Modal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} title="Receber Nova Encomenda">
+        {errorMsg && (
+          <div style={{ padding: '10px 14px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '14px' }}>
+            {errorMsg}
+          </div>
+        )}
         <form onSubmit={handleCreate}>
-          {errorMsg && <div className="badge badge-danger" style={{ marginBottom: 16, width: '100%' }}>{errorMsg}</div>}
           <div className="form-group">
-            <label>Unidade de Destino *</label>
+            <label>Unidade Destinatária <span className="required">*</span></label>
             <select
               className="form-control"
+              required
               value={newForm.unit_id}
               onChange={(e) => setNewForm({ ...newForm, unit_id: e.target.value })}
-              required
             >
-              <option value="">Selecione a Unidade...</option>
+              <option value="">Selecione o apartamento / unidade...</option>
               {units.map((u) => (
-                <option key={u.id} value={u.id}>Apto {u.number} ({u.block_name || 'Bloco'})</option>
+                <option key={u.id} value={u.id}>
+                  Unidade {u.number} {u.block_name ? `(${u.block_name})` : ''}
+                </option>
               ))}
             </select>
           </div>
-          <div className="form-group">
-            <label>Transportadora ou Entregador *</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Ex: Mercado Livre, Amazon, Jadlog, Correios..."
-              value={newForm.courier}
-              onChange={(e) => setNewForm({ ...newForm, courier: e.target.value })}
-              required
-            />
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label>Transportadora <span className="required">*</span></label>
+              <input
+                type="text"
+                className="form-control"
+                required
+                placeholder="Ex: Correios, Mercado Livre, Amazon"
+                value={newForm.courier}
+                onChange={(e) => setNewForm({ ...newForm, courier: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>Código de Rastreio</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Ex: BR123456789XP"
+                value={newForm.tracking_code}
+                onChange={(e) => setNewForm({ ...newForm, tracking_code: e.target.value })}
+              />
+            </div>
           </div>
+
           <div className="form-group">
-            <label>Código de Rastreio (Opcional)</label>
+            <label>Descrição do Volume</label>
             <input
               type="text"
               className="form-control"
-              placeholder="Ex: BR123456789"
-              value={newForm.tracking_code}
-              onChange={(e) => setNewForm({ ...newForm, tracking_code: e.target.value })}
-            />
-          </div>
-          <div className="form-group">
-            <label>Descrição do Pacote</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Ex: Caixa média, envelope de documentos..."
+              placeholder="Ex: Caixa média, envelope de documento"
               value={newForm.description}
               onChange={(e) => setNewForm({ ...newForm, description: e.target.value })}
             />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsNewModalOpen(false)}>Cancelar</button>
-            <button type="submit" className="btn btn-primary">Registrar e Gerar PIN</button>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '22px' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsNewModalOpen(false)}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary">
+              <Check size={16} />
+              <span>Registrar & Gerar PIN</span>
+            </button>
           </div>
         </form>
       </Modal>
 
-      {/* Modal Baixa com PIN e Keypad Interativo */}
-      <Modal isOpen={isPickupModalOpen} onClose={() => setIsPickupModalOpen(false)} title="Liberar Pacote por PIN">
-        <form onSubmit={handlePickup}>
-          {errorMsg && <div className="badge badge-danger" style={{ marginBottom: 16, width: '100%' }}>{errorMsg}</div>}
-          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-            <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)' }}>
-              Digite o PIN informado pelo morador do <strong>Apto {selectedDelivery?.unit_number}</strong>:
-            </p>
-            <div
-              style={{
-                fontSize: '2.2rem',
-                fontFamily: 'monospace',
-                fontWeight: 800,
-                letterSpacing: '12px',
-                padding: '12px',
-                background: 'var(--bg-app)',
-                borderRadius: 'var(--radius-md)',
-                marginTop: '10px',
-                color: 'var(--primary)'
-              }}
-            >
-              {pickupForm.pickup_code.padEnd(4, '•')}
+      {/* Modal 2: Baixa por PIN (Armário Digital) */}
+      <Modal
+        isOpen={isPickupModalOpen}
+        onClose={() => {
+          setIsPickupModalOpen(false);
+          setSelectedDelivery(null);
+          setPickupForm({ pickup_code: '', picked_up_by: '' });
+        }}
+        title="Liberação de Encomenda via PIN"
+      >
+        {selectedDelivery && (
+          <div>
+            <div style={{ padding: '12px 16px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: '18px' }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Destinatário:</div>
+              <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{selectedDelivery.resident_name || 'Morador'} • Unidade {selectedDelivery.unit_number}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '2px' }}>Transportadora: {selectedDelivery.courier}</div>
             </div>
-          </div>
 
-          {/* Teclado Virtual Numérico Tátil */}
-          <div className="pin-keypad">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'DEL'].map((k, idx) => (
-              k === '' ? <div key={idx} /> : (
+            {errorMsg && (
+              <div style={{ padding: '10px 14px', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '16px' }}>
+                {errorMsg}
+              </div>
+            )}
+
+            <form onSubmit={handlePickup}>
+              {/* Display visual dos 4 dígitos */}
+              <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                  Digite o PIN de 4 dígitos informado pelo morador:
+                </span>
+              </div>
+
+              <div className="pin-display">
+                {[0, 1, 2, 3].map((idx) => {
+                  const char = pickupForm.pickup_code[idx];
+                  return (
+                    <div key={idx} className={`pin-slot ${char ? 'filled' : ''}`}>
+                      {char || '•'}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Keypad Virtual de Alta Precisão */}
+              <div className="pin-keypad">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'CLEAR', '0', 'DEL'].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    className="pin-key"
+                    onClick={() => handleKeypadPress(val)}
+                    style={val === 'CLEAR' || val === 'DEL' ? { fontSize: '0.75rem', fontWeight: 700 } : {}}
+                  >
+                    {val === 'DEL' ? '⌫' : val === 'CLEAR' ? 'C' : val}
+                  </button>
+                ))}
+              </div>
+
+              <div className="form-group" style={{ marginTop: '18px' }}>
+                <label>Identificação de Quem Retirou <span className="required">*</span></label>
+                <input
+                  type="text"
+                  className="form-control"
+                  required
+                  placeholder="Nome completo de quem está retirando"
+                  value={pickupForm.picked_up_by}
+                  onChange={(e) => setPickupForm({ ...pickupForm, picked_up_by: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
                 <button
-                  key={k}
                   type="button"
-                  className="pin-key"
-                  onClick={() => handleKeypadPress(k)}
+                  className="btn btn-secondary"
+                  onClick={() => setIsPickupModalOpen(false)}
                 >
-                  {k}
+                  Cancelar
                 </button>
-              )
-            ))}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={pickupForm.pickup_code.length !== 4 || !pickupForm.picked_up_by.trim()}
+                >
+                  <CheckCircle2 size={16} />
+                  <span>Confirmar Baixa</span>
+                </button>
+              </div>
+            </form>
           </div>
-
-          <div className="form-group" style={{ marginTop: '14px' }}>
-            <label>Retirado por (Opcional)</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Ex: Próprio morador, familiar..."
-              value={pickupForm.picked_up_by}
-              onChange={(e) => setPickupForm({ ...pickupForm, picked_up_by: e.target.value })}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsPickupModalOpen(false)}>Cancelar</button>
-            <button type="submit" className="btn btn-success" disabled={pickupForm.pickup_code.length !== 4}>
-              Confirmar e Liberar Pacote
-            </button>
-          </div>
-        </form>
+        )}
       </Modal>
     </div>
   );
