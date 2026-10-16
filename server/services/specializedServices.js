@@ -1,6 +1,13 @@
 import { BaseService } from './BaseService.js';
 import { BaseRepository } from '../database/BaseRepository.js';
 import {
+  Condominium,
+  Block,
+  Unit,
+  Resident,
+  Vehicle,
+  Space,
+  Announcement,
   Delivery,
   AccessLog,
   Reservation,
@@ -10,7 +17,140 @@ import {
 } from '../models/index.js';
 import db from '../config/database.js';
 
-// 1. Serviço Especializado de Encomendas
+// ----------------------------------------------------
+// 1. Serviço de Condomínios
+// ----------------------------------------------------
+export class CondominiumService extends BaseService {
+  constructor() {
+    super(new BaseRepository('condominiums', { hasDirectTenant: false }), Condominium);
+  }
+
+  getBlocks(condominiumId) {
+    return db.prepare('SELECT * FROM blocks WHERE condominium_id = ? ORDER BY name ASC').all(condominiumId);
+  }
+
+  createBlock(condominiumId, blockData) {
+    const block = new Block({ ...blockData, condominium_id: Number(condominiumId) });
+    block.validate();
+    const repo = new BaseRepository('blocks');
+    return repo.create(block.toJSON());
+  }
+}
+
+// ----------------------------------------------------
+// 2. Serviço de Blocos / Torres
+// ----------------------------------------------------
+export class BlockService extends BaseService {
+  constructor() {
+    super(new BaseRepository('blocks'), Block);
+  }
+
+  getUnits(blockId) {
+    return db.prepare('SELECT * FROM units WHERE block_id = ? ORDER BY number ASC').all(blockId);
+  }
+}
+
+// ----------------------------------------------------
+// 3. Serviço de Unidades Habitacionais
+// ----------------------------------------------------
+export class UnitService extends BaseService {
+  constructor() {
+    super(new BaseRepository('units', { hasDirectTenant: false }), Unit);
+  }
+
+  getAllForCondo(condominiumId) {
+    return db.prepare(`
+      SELECT u.*, b.name as block_name
+      FROM units u
+      JOIN blocks b ON u.block_id = b.id
+      WHERE b.condominium_id = ?
+      ORDER BY u.number ASC
+    `).all(condominiumId);
+  }
+}
+
+// ----------------------------------------------------
+// 4. Serviço de Moradores
+// ----------------------------------------------------
+export class ResidentService extends BaseService {
+  constructor() {
+    super(new BaseRepository('residents', { hasDirectTenant: false }), Resident);
+  }
+
+  search(condominiumId, { unit_id, search } = {}) {
+    let sql = `
+      SELECT r.*, u.number as unit_number, b.name as block_name
+      FROM residents r
+      JOIN units u ON r.unit_id = u.id
+      JOIN blocks b ON u.block_id = b.id
+      WHERE b.condominium_id = ?
+    `;
+    const params = [condominiumId];
+
+    if (unit_id) {
+      sql += ' AND r.unit_id = ?';
+      params.push(unit_id);
+    }
+    if (search) {
+      sql += ' AND (r.name LIKE ? OR r.email LIKE ? OR r.cpf LIKE ?)';
+      const term = `%${search}%`;
+      params.push(term, term, term);
+    }
+    sql += ' ORDER BY r.name ASC';
+    return db.prepare(sql).all(...params);
+  }
+}
+
+// ----------------------------------------------------
+// 5. Serviço de Veículos
+// ----------------------------------------------------
+export class VehicleService extends BaseService {
+  constructor() {
+    super(new BaseRepository('vehicles', { hasDirectTenant: false }), Vehicle);
+  }
+
+  getAllForCondo(condominiumId) {
+    return db.prepare(`
+      SELECT v.*, u.number as unit_number, r.name as resident_name, b.name as block_name
+      FROM vehicles v
+      JOIN units u ON v.unit_id = u.id
+      JOIN blocks b ON u.block_id = b.id
+      LEFT JOIN residents r ON v.resident_id = r.id
+      WHERE b.condominium_id = ?
+      ORDER BY v.id DESC
+    `).all(condominiumId);
+  }
+}
+
+// ----------------------------------------------------
+// 6. Serviço de Espaços Comuns
+// ----------------------------------------------------
+export class SpaceService extends BaseService {
+  constructor() {
+    super(new BaseRepository('spaces'), Space);
+  }
+}
+
+// ----------------------------------------------------
+// 7. Serviço de Mural de Comunicados
+// ----------------------------------------------------
+export class AnnouncementService extends BaseService {
+  constructor() {
+    super(new BaseRepository('announcements'), Announcement);
+  }
+
+  getRecentAndPinned(condominiumId) {
+    return db.prepare(`
+      SELECT * FROM announcements
+      WHERE condominium_id = ?
+      ORDER BY is_pinned DESC, id DESC
+    `).all(condominiumId);
+  }
+}
+
+// ----------------------------------------------------
+// 8. Serviço Especializado de Encomendas
+// ----------------------------------------------------
 export class DeliveryService extends BaseService {
   constructor() {
     super(new BaseRepository('deliveries', { hasDirectTenant: false }), Delivery);
@@ -63,7 +203,9 @@ export class DeliveryService extends BaseService {
   }
 }
 
-// 2. Serviço Especializado de Portaria / Controle de Acesso
+// ----------------------------------------------------
+// 9. Serviço Especializado de Portaria / Controle de Acesso
+// ----------------------------------------------------
 export class AccessService extends BaseService {
   constructor() {
     super(new BaseRepository('access_logs', { hasDirectTenant: false }), AccessLog);
@@ -106,7 +248,9 @@ export class AccessService extends BaseService {
   }
 }
 
-// 3. Serviço de Reservas com Bloqueio de Conflitos
+// ----------------------------------------------------
+// 10. Serviço de Reservas com Bloqueio de Conflitos
+// ----------------------------------------------------
 export class ReservationService extends BaseService {
   constructor() {
     super(new BaseRepository('reservations', { hasDirectTenant: false }), Reservation);
@@ -156,7 +300,9 @@ export class ReservationService extends BaseService {
   }
 }
 
-// 4. Serviço Financeiro & Balancetes
+// ----------------------------------------------------
+// 11. Serviço Financeiro & Balancetes
+// ----------------------------------------------------
 export class FinancialService extends BaseService {
   constructor() {
     super(new BaseRepository('financial_transactions'), FinancialTransaction);
@@ -211,7 +357,9 @@ export class FinancialService extends BaseService {
   }
 }
 
-// 5. Serviço do Mercadinho Autônomo (PDV com Transações ACID)
+// ----------------------------------------------------
+// 12. Serviço do Mercadinho Autônomo (PDV com Transações ACID)
+// ----------------------------------------------------
 export class MarketService extends BaseService {
   constructor() {
     super(new BaseRepository('market_products'), MarketProduct);
@@ -279,7 +427,9 @@ export class MarketService extends BaseService {
   }
 }
 
-// 6. Serviço de Dashboard Consolidado
+// ----------------------------------------------------
+// 13. Serviço de Dashboard Consolidado
+// ----------------------------------------------------
 export class DashboardService {
   static getMetrics(condominiumId) {
     const pendingDeliveries = db.prepare(`
