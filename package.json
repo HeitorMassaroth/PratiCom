@@ -1,0 +1,24 @@
+{
+  "name": "praticom-client",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "db:init": "node database/initDatabase.js",
+    "db:test": "node database/tests/test_database.js",
+    "test:domain": "node src/domain/tests/test_domain_ddd.js",
+    "test:all": "node database/tests/test_database.js && node src/domain/tests/test_domain_ddd.js",
+    "server": "node server/server.js"
+  },
+  "dependencies": {
+    "lucide-react": "^0.344.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.2"
+  }
+}

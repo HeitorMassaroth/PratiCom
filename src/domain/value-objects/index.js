@@ -1,0 +1,10 @@
+export { CPF } from './CPF.js';
+export { CNPJ } from './CNPJ.js';
+export { LicensePlate } from './LicensePlate.js';
+export { Money } from './Money.js';
+export { PickupPIN } from './PickupPIN.js';
+export { TimeRange } from './TimeRange.js';
+export { Email } from './Email.js';
+export { Phone } from './Phone.js';
+export { Barcode } from './Barcode.js';
+export { PostalCode } from './PostalCode.js';

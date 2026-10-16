@@ -1,47 +1,16 @@
-# 🏢 PratiCom ERP v2 — Gestão Condominial Inteligente
+# 🏢 PratiCom ERP — Gestão Condominial Inteligente (Front-End Standalone)
 
 <p align="center">
-  <b>Plataforma reescrita do zero sob arquitetura Clean MVC + DDD, máxima simplificação, reuso de código e interface moderna.</b>
+  <b>Interface corporativa de alta performance, 100% autônoma no navegador, com dados integrados e resposta instantânea (On-Click).</b>
 </p>
 
 ---
 
-## 🏛️ Arquitetura Clean MVC + DDD
+## ⚡ Características do Sistema
 
-O sistema foi repensado para ser simples, irredutível e altamente reutilizável:
-
-```
-[ Frontend: React 18 + Vite ]
-               │
-               ▼
-┌──────────────────────────────┐
-│  ROUTES (/server/routes)     │ ➔ Mapeia os endpoints HTTP para os controladores
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│ CONTROLLERS (/controllers)   │ ➔ BaseController conciso e reutilizável
-└──────────────┬───────────────┘
-               ▼
-┌──────────────────────────────┐
-│  SERVICES (/server/services) │ ➔ BaseService com validação estrita DDD pré-persistência
-└──────┬───────────────┬───────┘
-       │               │
-       ▼               ▼
-┌──────────────┐ ┌──────────────────────────────┐
-│ MODELS (DDD) │ │ DATABASE (/server/database)  │
-│ BaseEntity + │ │ BaseRepository com SQLite 3  │
-│ 10 Entidades │ │ WAL Mode + Foreign Keys ON   │
-└──────────────┘ └──────────────────────────────┘
-```
-
-> **Classificação DDD Obrigatória**: Qualquer dado antes de ser inserido ou atualizado no banco de dados SQLite passa obrigatoriamente pela validação de invariantes de sua respectiva classe de Domínio DDD (`.validate()`).
-
----
-
-## 📋 Catálogo Completo de Requisitos
-
-Consulte a especificação detalhada de todos os 12 CRUDs, fluxos e regras de negócio no arquivo:
-👉 [REQUISITOS_SISTEMA_PRATICOM.md](REQUISITOS_SISTEMA_PRATICOM.md)
+- **Arquitetura Front-End Autônoma**: Executa diretamente no navegador via Vite + React 18, sem necessidade de servidor backend ou banco de dados externo.
+- **Respostas Instantâneas (On-Click)**: Todas as ações de portaria, encomendas com PIN, checkout PDV com PIX, reservas e baixas contábeis funcionam em tempo real com estado persistido no `localStorage`.
+- **Identidade Visual Corporativa**: Design system sóbrio (Slate Industrial & Blue), tipografia nítida (*Plus Jakarta Sans* e fonte tabular *Mono*), alternância Dark/Light mode e densidade de ERP profissional.
 
 ---
 
@@ -50,39 +19,28 @@ Consulte a especificação detalhada de todos os 12 CRUDs, fluxos e regras de ne
 ### Pré-requisitos
 * [Node.js](https://nodejs.org/) v18+ e `npm`
 
----
-
-### Opção 1: Inicialização Automática (Windows PowerShell)
-```powershell
-.\start_app.ps1
+### 1. Instalar dependências (se necessário)
+```bash
+npm.cmd install
 ```
 
----
-
-### Opção 2: Inicialização Manual
-
-#### 1. Iniciar o Backend
+### 2. Iniciar o servidor de desenvolvimento
 ```bash
-cd server
-npm.cmd install
 npm.cmd run dev
 ```
-*Disponível em: `http://localhost:5000`*
 
-#### 2. Iniciar o Frontend
-```bash
-cd client
-npm.cmd install
-npm.cmd run dev
-```
-*Disponível em: `http://localhost:5173`*
+Acesse o sistema no navegador:
+👉 **`http://localhost:5173`**
 
 ---
 
-## 🧪 Suíte de Testes Automatizados
+## 📦 Módulos Disponíveis e Funcionais
 
-Para rodar a verificação de integridade do banco SQLite, validações DDD e serviços:
-```bash
-cd server
-node tests/verify_all.mjs
-```
+1. **Dashboard Geral**: Indicadores operacionais consolidados, alertas de estoque crítico e atalhos de rotina.
+2. **Encomendas & Armário Digital**: Recebimento de pacotes, geração automática de PIN de 4 dígitos, keypad numérico para conferência e cancelamento.
+3. **Portaria & Controle de Acessos**: Registro de entrada de visitantes/prestadores com formatação de placas Mercosul e baixa de saída em 1 clique.
+4. **Moradores & Frotas**: Gestão integrada de unidades, condôminos, contatos de emergência e veículos autorizados.
+5. **Áreas Comuns & Reservas**: Catálogo de espaços e agendamentos com validação instantânea de conflitos de horário.
+6. **Financeiro & Balancetes**: Livro-razão contábil com alinhamento tabular de valores, barra percentual de arrecadação mensal e baixa imediata de títulos.
+7. **Mercadinho Autônomo (PDV)**: Autoatendimento com catálogo categorizado, carrinho dinâmico com controle de quantidade (+/-) e checkout via PIX com QR code e cópia de chave.
+8. **Mural de Comunicados**: Publicação de avisos com níveis de prioridade e opção de fixar comunicados no topo.
