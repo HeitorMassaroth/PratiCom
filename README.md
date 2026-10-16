@@ -215,3 +215,14 @@ Os protótipos de alta fidelidade e referências visuais estão organizados no d
 ## 📄 Licença
 
 Este projeto está desenvolvido sob licença proprietária para gestão condominial. Todos os direitos reservados.
+
+---
+
+## 📌 Branch e Versão Regular (`Praticom_Regular` / `regular_PRaticon`)
+
+Esta branch consolida a versão regular e estável do **PratiCom ERP**, integrando:
+* **Padrões de Projeto GoF**: Implementação rigorosa de Singletons (`DatabaseSingleton`, `AppConfigSingleton`), DAOs com Factory Method (`DAOFactory`), e Template Method para processamento e validação.
+* **Camada de Domínio e Repositórios**: Modelagem rica orientada a domínio (10 Entidades DDD) e repositórios padronizados com compactação de código (`BaseRepository`).
+* **Multi-Tenancy e Isolamento Lógico**: Separação estrita por condomínio via headers e middlewares de segurança (`tenantContextMiddleware`, `moduleGuard`).
+* **Banco de Dados SQLite**: Persistência relacional com integridade referencial ativa (`PRAGMA foreign_keys = ON`) e modo WAL.
+
